@@ -32,7 +32,7 @@ Jasno zdefiniowany cel końcowy projektu (MVP):
 - [x] Prosty interfejs użytkownika do przeglądu i zatwierdzania/odrzucania propozycji.
 - [x] Serwer MCP (STDIO dla Antigravity, HTTPS dla ChatGPT) udostępniający te same serwisy domenowe.
 - [x] Testy automatyczne (pokrycie kluczowych modułów > 80%, testy mockujące Simkl/TMDB/LLM).
-- [ ] Dokumentacja uruchomieniowa i szablon `.env.example`.
+- [x] Dokumentacja uruchomieniowa i szablon `.env.example`.
 
 ## Bieżący Stan i Architektura
 
