@@ -6,7 +6,7 @@ priority: P1
 category: dev
 created: "2026-11-06"
 updated: "2026-11-14"
-next_action: "Ręczna weryfikacja i ewaluacja jakości wygenerowanych w PoC rekomendacji (data/output/recommendations_poc.json) przez użytkownika przed przejściem do Etapu 0"
+next_action: "Zrealizować Etap 0 (Fundament): struktura katalogów w app/, konfiguracja FastAPI, modele bazy SQLite wg DATA_MODEL.md oraz Pydantic Settings"
 tags:
   - movie-recommendation
   - simkl
@@ -24,7 +24,7 @@ Prywatny system rekomendacji filmów i seriali oparty na Simkl, profilu gustu u�
 ## Cel i Pożądany Rezultat (Definition of Done)
 
 Jasno zdefiniowany cel końcowy projektu (MVP):
-- [ ] Działający skrypt PoC (Simkl Taste Engine) walidujący jakość profilowania i rekomendacji LLM.
+- [x] Działający skrypt PoC (Simkl Taste Engine) walidujący jakość profilowania i rekomendacji LLM.
 - [ ] Stabilny szkielet aplikacji w `FastAPI` z bazą `SQLite` i migracjami.
 - [ ] Integracja z Simkl: autoryzacja, synchronizacja biblioteki/ocen/Plan to Watch, idempotentny zapis wyłącznie zaakceptowanych pozycji.
 - [ ] Wersjonowany profil gustu użytkownika z możliwością ręcznej korekty.
@@ -46,11 +46,13 @@ Jasno zdefiniowany cel końcowy projektu (MVP):
 - **Stan bieżący**:
   - Dokumentacja projektowa i architektoniczna zweryfikowana (`PRODUCT.md`, `ARCHITECTURE.md`, `DATA_MODEL.md`, `API_CONTRACTS.md`, `RECOMMENDATION_ENGINE.md`, `AGENTS.md`, `ROADMAP.md`).
   - Zainicjowano repozytorium Git oraz skonfigurowano środowisko (`pyproject.toml`, `.env.example`, `.gitignore`).
-  - Zaimplementowano i przetestowano skrypt badawczy `scripts/poc_taste_engine.py` (ekstrakcja historii Simkl, twardy filtr anty-rekomendacji, generowanie profilu gustu oraz wygenerowanie 10 filmów i 5 seriali).
+  - Zaimplementowano i przetestowano skrypt badawczy `scripts/poc_taste_engine.py` (ekstrakcja historii Simkl, filtr anty-rekomendacji, integracja z Simkl API przez OAuth 2.0 Device Flow oraz profilowanie przez model Gemini 2.5 Flash).
   - Skrypt pomyślnie wygenerował pliki `data/output/taste_profile_poc.json` i `data/output/recommendations_poc.json`.
-  - Wszystkie testy jednostkowe przechodzą (5/5 OK). Potwierdzono gwarancję zera operacji zapisu do Simkl.
+  - Użytkownik przeprowadził ewaluację jakościową: profil gustu został oceniony jako **bardzo trafny**. Zgłoszono uwagę dotyczącą preferencji ograniczenia animacji i zbalansowania sci-fi w docelowej integracji z TMDB (Etap 3).
+  - Wszystkie testy jednostkowe przechodzą (6/6 OK). Potwierdzono gwarancję zera operacji zapisu do Simkl.
 - **Kluczowe moduły**:
   - `scripts/poc_taste_engine.py` — samodzielny skrypt badawczy PoC
+  - `scripts/get_simkl_token.py` — asystent autoryzacji OAuth 2.0 Simkl Device Flow
   - `app/api/` — endpointy REST (FastAPI)
   - `app/integrations/` — adaptery do Simkl, TMDB, LLM
   - `app/services/` — logika domenowa (sync, profil gustu, ranking, rekomendacje)
@@ -61,11 +63,11 @@ Jasno zdefiniowany cel końcowy projektu (MVP):
 
 ## Najbliższy Krok (Next Action)
 
-> Skonfigurować środowisko narzędziowe (uv, pyproject.toml, ruff, pytest) oraz przygotować szablon .env.example i szkielet scripts/poc_taste_engine.py dla Etapu PoC.
+> Zrealizować Etap 0 (Fundament): struktura katalogów w app/, konfiguracja FastAPI, modele bazy SQLite wg DATA_MODEL.md oraz Pydantic Settings.
 
 ## Blokady (Blockers)
 
-Brak. Czekamy na decyzję użytkownika o rozpoczęciu prac nad PoC.
+Brak. Etap PoC pomyślnie zakończony, środowisko i autoryzacje Simkl/Gemini działają.
 
 ## Backlog Zadań
 
@@ -73,7 +75,7 @@ Brak. Czekamy na decyzję użytkownika o rozpoczęciu prac nad PoC.
 - [x] Przygotowanie szablonu `.env.example` (zmienne dla Simkl i Gemini API) oraz konfiguracji `pyproject.toml` (`uv`)
 - [x] Implementacja skryptu `scripts/poc_taste_engine.py` do pobrania historii Simkl
 - [x] Generowanie profilu gustu i 10 filmów + 5 seriali przez Gemini
-- [ ] Ewaluacja jakości wygenerowanych rekomendacji przez użytkownika
+- [x] Ewaluacja jakości wygenerowanych rekomendacji przez użytkownika
 
 ### Etap 0: Fundament
 - [ ] Inicjalizacja repozytorium i struktury `app/`
@@ -121,3 +123,12 @@ Brak. Czekamy na decyzję użytkownika o rozpoczęciu prac nad PoC.
   3. Jako wiodący model LLM dla etapu PoC wybrano `Gemini` (Google GenAI SDK), z architekturą docelową wspierającą OpenAI.
   4. PoC zostanie zrealizowany w formie niezależnego skryptu badawczego `scripts/poc_taste_engine.py`, pobierającego dane z Simkl i zapisującego wygenerowane propozycje do pliku JSON.
 - **Uzasadnienie**: Umożliwienie natychmiastowej ewaluacji jakości algorytmu promptowania i profilu gustu bez konieczności przedwczesnej budowy pełnego serwera API i bazy danych.
+
+### 2026-11-14 — Zakończenie Etapu PoC i wnioski z profilowania gustu
+- **Decyzja / Zmiana**:
+  1. Pomyślnie zweryfikowano i zaakceptowano działanie silnika profilowania LLM (Gemini 2.5 Flash) na rzeczywistych danych konta Simkl użytkownika.
+  2. Zaimplementowano obsługę autoryzacji Simkl Auth V2 (RFC 8628 Device Flow) w dedykowanym asystencie `scripts/get_simkl_token.py`.
+  3. Zaimplementowano dynamiczne auto-wykrywanie modeli w `GeminiProvider`.
+  4. Potwierdzono trafność opisu profilu gustu użytkownika (orientacja na Crime, Drama, Thriller, Historical Realism, moralną niejednoznaczność i wyrazistych reżyserów).
+  5. **Wniosek do Etapu 3 (Rekomendacje)**: Pula kandydatów w PoC zawierała sztywną listę tytułów (stąd obecność animacji *Scavengers Reign* oraz nadmiaru sci-fi). W docelowym silniku kandydaci będą pobierani dynamicznie z TMDB z uwzględnieniem preferencji dotyczących wykluczania animacji oraz zachowania właściwych proporcji gatunkowych.
+- **Uzasadnienie**: Spełnienie kryteriów akceptacji Etapu PoC z ROADMAP.md i formalne przejście do prac nad Etapem 0 (Fundament).

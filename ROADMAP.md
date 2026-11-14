@@ -7,9 +7,9 @@
 -   [x] Analiza preferencji przez LLM (Google GenAI / Gemini).
 -   [x] Wygenerowanie pierwszego profilu gustu w JSON.
 -   [x] Wygenerowanie zestawu 10 rekomendacji filmów i 5 seriali z uzasadnieniami.
--   [ ] Ręczna weryfikacja trafności rekomendacji przez użytkownika.
+-   [x] Ręczna weryfikacja trafności rekomendacji przez użytkownika.
 
-**Akceptacja:** wygenerowany plik JSON z profilem gustu oraz 10 filmami i 5 serialami oceniony jakościowo przez użytkownika przed budową pełnej architektury.
+**Akceptacja:** wygenerowany plik JSON z profilem gustu oraz 10 filmami i 5 serialami oceniony jakościowo przez użytkownika przed budową pełnej architektury. (Ukończono pomyślnie)
 
 ## Etap 0 -- fundament
 
