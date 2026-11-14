@@ -2,11 +2,11 @@
 
 ## Etap PoC -- Simkl Taste Engine (walidacja koncepcji)
 
--   [ ] Skrypt badawczy `scripts/poc_taste_engine.py` i konfiguracja `.env.example`.
--   [ ] Połączenie z API Simkl i pobranie historii/ocen użytkownika.
--   [ ] Analiza preferencji przez LLM (Google GenAI / Gemini).
--   [ ] Wygenerowanie pierwszego profilu gustu w JSON.
--   [ ] Wygenerowanie zestawu 10 rekomendacji filmów i 5 seriali z uzasadnieniami.
+-   [x] Skrypt badawczy `scripts/poc_taste_engine.py` i konfiguracja `.env.example`.
+-   [x] Połączenie z API Simkl i pobranie historii/ocen użytkownika.
+-   [x] Analiza preferencji przez LLM (Google GenAI / Gemini).
+-   [x] Wygenerowanie pierwszego profilu gustu w JSON.
+-   [x] Wygenerowanie zestawu 10 rekomendacji filmów i 5 seriali z uzasadnieniami.
 -   [ ] Ręczna weryfikacja trafności rekomendacji przez użytkownika.
 
 **Akceptacja:** wygenerowany plik JSON z profilem gustu oraz 10 filmami i 5 serialami oceniony jakościowo przez użytkownika przed budową pełnej architektury.

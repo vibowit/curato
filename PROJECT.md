@@ -6,7 +6,7 @@ priority: P1
 category: dev
 created: "2026-11-06"
 updated: "2026-11-14"
-next_action: "Skonfigurować środowisko narzędziowe (uv, pyproject.toml, ruff, pytest) oraz przygotować szablon .env.example i szkielet scripts/poc_taste_engine.py dla Etapu PoC"
+next_action: "Ręczna weryfikacja i ewaluacja jakości wygenerowanych w PoC rekomendacji (data/output/recommendations_poc.json) przez użytkownika przed przejściem do Etapu 0"
 tags:
   - movie-recommendation
   - simkl
@@ -45,8 +45,10 @@ Jasno zdefiniowany cel końcowy projektu (MVP):
   - Interfejs agentowy: MCP server (STDIO / Streamable HTTP)
 - **Stan bieżący**:
   - Dokumentacja projektowa i architektoniczna zweryfikowana (`PRODUCT.md`, `ARCHITECTURE.md`, `DATA_MODEL.md`, `API_CONTRACTS.md`, `RECOMMENDATION_ENGINE.md`, `AGENTS.md`, `ROADMAP.md`).
-  - Przeprowadzono wywiad `/grill-me` i uzgodniono wprowadzenie **Etapu PoC (Simkl Taste Engine)** przed Etapem 0 w celu szybkiej walidacji jakości rekomendacji bez overheadu infrastrukturalnego.
-  - Wybrano zestaw narzędzi: `uv`, `ruff`, `pytest`, `Gemini` jako model wiodący dla PoC.
+  - Zainicjowano repozytorium Git oraz skonfigurowano środowisko (`pyproject.toml`, `.env.example`, `.gitignore`).
+  - Zaimplementowano i przetestowano skrypt badawczy `scripts/poc_taste_engine.py` (ekstrakcja historii Simkl, twardy filtr anty-rekomendacji, generowanie profilu gustu oraz wygenerowanie 10 filmów i 5 seriali).
+  - Skrypt pomyślnie wygenerował pliki `data/output/taste_profile_poc.json` i `data/output/recommendations_poc.json`.
+  - Wszystkie testy jednostkowe przechodzą (5/5 OK). Potwierdzono gwarancję zera operacji zapisu do Simkl.
 - **Kluczowe moduły**:
   - `scripts/poc_taste_engine.py` — samodzielny skrypt badawczy PoC
   - `app/api/` — endpointy REST (FastAPI)
@@ -68,9 +70,9 @@ Brak. Czekamy na decyzję użytkownika o rozpoczęciu prac nad PoC.
 ## Backlog Zadań
 
 ### Etap PoC: Simkl Taste Engine (walidacja koncepcji)
-- [ ] Przygotowanie szablonu `.env.example` (zmienne dla Simkl i Gemini API) oraz konfiguracji `pyproject.toml` (`uv`)
-- [ ] Implementacja skryptu `scripts/poc_taste_engine.py` do pobrania historii Simkl
-- [ ] Generowanie profilu gustu i 10 filmów + 5 seriali przez Gemini
+- [x] Przygotowanie szablonu `.env.example` (zmienne dla Simkl i Gemini API) oraz konfiguracji `pyproject.toml` (`uv`)
+- [x] Implementacja skryptu `scripts/poc_taste_engine.py` do pobrania historii Simkl
+- [x] Generowanie profilu gustu i 10 filmów + 5 seriali przez Gemini
 - [ ] Ewaluacja jakości wygenerowanych rekomendacji przez użytkownika
 
 ### Etap 0: Fundament
