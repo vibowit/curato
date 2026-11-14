@@ -42,14 +42,14 @@ danych powstał. (Ukończono pomyślnie)
 
 ## Etap 3 -- rekomendacje
 
--   [ ] Integracja TMDB.
--   [ ] Generowanie i normalizacja kandydatów.
--   [ ] Filtry obejrzanych, Plan to Watch i odrzuconych.
--   [ ] Ranking regułowy i ocena LLM.
--   [ ] Dywersyfikacja i zapis przebiegów.
+-   [x] Integracja TMDB.
+-   [x] Generowanie i normalizacja kandydatów.
+-   [x] Filtry obejrzanych, Plan to Watch i odrzuconych.
+-   [x] Ranking regułowy i ocena LLM.
+-   [x] Dywersyfikacja i zapis przebiegów.
 
 **Akceptacja:** system tworzy listę 10 filmów i 5 seriali bez duplikatów
-i z uzasadnieniami.
+i z uzasadnieniami. (Ukończono pomyślnie)
 
 ## Etap 4 -- panel i zatwierdzanie
 

@@ -6,7 +6,7 @@ priority: P1
 category: dev
 created: "2026-11-06"
 updated: "2026-11-14"
-next_action: "Zrealizować Etap 3 (Rekomendacje): integracja z TMDB, wyszukiwanie kandydatów, filtry anty-rekomendacji, ranking regułowy + ocena semantyczna LLM, dywersyfikacja i rejestracja przebiegów"
+next_action: "Zrealizować Etap 4 (Panel i zatwierdzanie): rejestracja decyzji użytkownika (accept, reject, seen, later), idempotentny zapis zaakceptowanych do Simkl oraz prosty interfejs przeglądu propozycji"
 tags:
   - movie-recommendation
   - simkl
@@ -28,7 +28,7 @@ Jasno zdefiniowany cel końcowy projektu (MVP):
 - [x] Stabilny szkielet aplikacji w `FastAPI` z bazą `SQLite` i migracjami.
 - [x] Integracja z Simkl: autoryzacja, synchronizacja biblioteki/ocen/Plan to Watch, idempotentny zapis wyłącznie zaakceptowanych pozycji.
 - [x] Wersjonowany profil gustu użytkownika z możliwością ręcznej korekty.
-- [ ] Silnik rekomendacji integrujący TMDB i LLM (10 filmów, 5 seriali na edycję) z uzasadnieniami i bez duplikatów.
+- [x] Silnik rekomendacji integrujący TMDB i LLM (10 filmów, 5 seriali na edycję) z uzasadnieniami i bez duplikatów.
 - [ ] Prosty interfejs użytkownika do przeglądu i zatwierdzania/odrzucania propozycji.
 - [ ] Serwer MCP (STDIO dla Antigravity, HTTPS dla ChatGPT) udostępniający te same serwisy domenowe.
 - [ ] Testy automatyczne (pokrycie kluczowych modułów > 80%, testy mockujące Simkl/TMDB/LLM).
@@ -68,30 +68,40 @@ Jasno zdefiniowany cel końcowy projektu (MVP):
     - Zaimplementowano domenowy serwis `TasteService` (`app/services/taste.py`): ekstrakcja historii z bazy SQLite (`watch_history` + `media_items`), kalkulacja proweniencji (`based_on_sync_at`), promptowanie LLM i walidacja Pydantic, atomowe wersjonowanie (`v1.0-gemini`, `v2.0-gemini`), zarządzanie unikalną flagą `active=True`, audyt historii wersji oraz mechanizm ręcznej korekty (`v1.1-manual`) wraz z rejestracją notatki zmiany (`change_note`).
     - Zaimplementowano endpointy REST API (`app/api/v1/profile.py`): `GET /api/profile`, `POST /api/profile/generate`, `GET /api/profile/versions`, `GET /api/profile/versions/{version}`, `PUT /api/profile` oraz `POST /api/profile/versions/{version}/activate`.
     - Rozszerzono zestaw testów automatycznych do **58 testów** (`pytest`) przechodzących w 100%, z pokryciem testowym schematów, klienta LLM (mock transport), serwisu gustu oraz endpointów API.
+  - Zrealizowano i przetestowano **Etap 3 (Rekomendacje)**:
+    - Zaimplementowano asynchronicznego klienta TMDB API (`app/integrations/tmdb.py`) obsługującego uwierzytelnianie kluczem API v3 oraz bearer tokenem v4, throttling (20 req/s), automatyczne ponawianie z wykładniczym backoffem oraz pobieranie rekomendacji, odkrywanie gatunkowe i powiązania z reżyserami/twórcami.
+    - Zaimplementowano moduł agregacji kandydatów (`app/services/discovery.py`) realizujący podział puli: 40% podobne do ulubionych, 35% preferowane gatunki z aktywnego profilu gustu, 15% pozycje od ulubionych reżyserów oraz 10% kontrolowana eksploracja, z normalizacją metadanych do `CandidateItem`.
+    - Zaimplementowano filtr anty-rekomendacji (`AntiRecommendationFilter` w `app/services/recommendations.py`) gwarantujący bezwzględne wykluczenie pozycji obejrzanych (`completed`, `watching`), znajdujących się na Plan to Watch, odrzuconych w przeszłości (`rejected`) oraz rekomendowanych w ciągu ostatnich 28 dni, a także wykluczanie animacji w oparciu o `anti_preferences`.
+    - Zaimplementowano ranking regułowy (`RuleBasedRanker`), ocenę semantyczną LLM (`SemanticScorer`) z ustrukturyzowanym formatem JSON (`LLMEvaluationBatchResponse`: match_score, confidence, czynniki pozytywne, ryzyka, uzasadnienie) oraz serwis dywersyfikacji (`DiversificationService`) z limitem maks. 2 pozycji tego samego twórcy.
+    - Zaimplementowano domenowy serwis `RecommendationService` orkiestrujący cały pipeline, transakcyjny zapis/upsert w SQLite (`MediaItem`, `RecommendationRun`, `Recommendation`) oraz endpointy REST API w `app/api/v1/recommendations.py` (`POST /api/recommendation-runs`, `GET /api/recommendation-runs/{run_id}`, `GET /api/recommendation-runs`).
+    - Rozszerzono zestaw testów automatycznych do **72 testów** (`pytest`) przechodzących w 100% z pełną zgodnością lintera `ruff`.
 - **Kluczowe moduły**:
   - `app/main.py` — fabryka aplikacji FastAPI, lifespan, middleware i obsługa błędów
   - `app/core/` — konfiguracja Pydantic Settings, silnik bazy SQLite i logowanie
-  - `app/models/` — modele SQLAlchemy 2.0 (`media_items`, `watch_history`, `taste_profiles`, itp.)
+  - `app/models/` — modele SQLAlchemy 2.0 (`media_items`, `watch_history`, `taste_profiles`, `recommendation_runs`, `recommendations`, itp.)
   - `app/integrations/simkl.py` — asynchroniczny klient API Simkl
+  - `app/integrations/tmdb.py` — asynchroniczny klient API TMDB v3/v4
   - `app/integrations/llm/` — adaptery LLM (`LLMProvider`, `GeminiLLMClient`)
-  - `app/schemas/taste.py` — schematy profilu gustu, wag, ręcznej korekty
+  - `app/schemas/` — schematy Pydantic (`taste.py`, `recommendation.py`, `sync.py`)
   - `app/services/sync.py` — synchronizacja przyrostowa z Simkl do SQLite
   - `app/services/watchlist.py` — kontrolowany i idempotentny zapis pozycji do Simkl
   - `app/services/taste.py` — analiza historii, wersjonowanie profilu i ręczna korekta
-  - `app/api/` — endpointy REST (w tym `/api/health`, `/api/sync/simkl`, `/api/profile`)
+  - `app/services/discovery.py` — zasilanie puli kandydatów z TMDB
+  - `app/services/recommendations.py` — filtry anty-rekomendacji, ranking, ocena LLM, dywersyfikacja i rejestracja przebiegów
+  - `app/api/` — endpointy REST (w tym `/api/health`, `/api/sync/simkl`, `/api/profile`, `/api/recommendation-runs`)
   - `migrations/` — migracje bazy danych Alembic
   - `scripts/poc_taste_engine.py` — samodzielny skrypt badawczy PoC
   - `scripts/get_simkl_token.py` — asystent autoryzacji OAuth 2.0 Simkl Device Flow
-  - `tests/` — testy jednostkowe i integracyjne (58 testów)
+  - `tests/` — testy jednostkowe i integracyjne (72 testy)
   - `data/` — lokalna baza SQLite i pliki wyjściowe
 
 ## Najbliższy Krok (Next Action)
 
-> Zrealizować Etap 3 (Rekomendacje): integracja z TMDB (kandydaci i metadane), filtry anty-rekomendacji (obejrzane, Plan to Watch, odrzucone), ranking regułowy + ocena semantyczna LLM, dywersyfikacja i rejestracja przebiegu w bazie.
+> Zrealizować Etap 4 (Panel i zatwierdzanie): rejestracja decyzji użytkownika (`accept`, `reject`, `seen`, `later`), idempotentny zapis zaakceptowanych do Simkl oraz prosty interfejs przeglądu propozycji.
 
 ## Blokady (Blockers)
 
-Brak. Profil gustu użytkownika, wersjonowanie, ręczna korekta oraz integracja LLM w pełni zaimplementowane i przetestowane.
+Brak. Silnik rekomendacji integrujący TMDB i LLM w pełni zaimplementowany i przetestowany.
 
 ## Backlog Zadań
 
@@ -119,15 +129,16 @@ Brak. Profil gustu użytkownika, wersjonowanie, ręczna korekta oraz integracja 
 - [x] Możliwość ręcznej korekty profilu
 
 ### Etap 3: Rekomendacje
-- [ ] Integracja z TMDB (wyszukiwanie kandydatów, metadane)
-- [ ] Filtry anty-rekomendacji (obejrzane, Plan to Watch, odrzucone)
-- [ ] Ranking regułowy + ocena semantyczna LLM
-- [ ] Dywersyfikacja wyników i rejestracja przebiegu w bazie
+- [x] Integracja z TMDB (wyszukiwanie kandydatów, metadane)
+- [x] Filtry anty-rekomendacji (obejrzane, Plan to Watch, odrzucone)
+- [x] Ranking regułowy + ocena semantyczna LLM
+- [x] Dywersyfikacja wyników i rejestracja przebiegu w bazie
 
 ### Etap 4: Panel i zatwierdzanie
 - [ ] Minimalny UI do przeglądu propozycji
 - [ ] Rejestracja decyzji użytkownika (`accept`, `reject`, `seen`, `later`)
 - [ ] Idempotentne, kontrolowane dodawanie zaakceptowanych pozycji do Simkl
+- [ ] Historia przebiegów i decyzji
 
 ### Etap 5: MCP i harmonogram
 - [ ] Narzędzia MCP STDIO dla Antigravity
@@ -185,3 +196,14 @@ Brak. Profil gustu użytkownika, wersjonowanie, ręczna korekta oraz integracja 
   5. Dodano pełny zestaw endpointów REST API: `GET /api/profile`, `POST /api/profile/generate`, `GET /api/profile/versions`, `GET /api/profile/versions/{version}`, `PUT /api/profile` oraz `POST /api/profile/versions/{version}/activate`.
   6. Rozszerzono zestaw testów automatycznych do 58 testów przechodzących w 100% (`pytest`) oraz pełną zgodność lintera `ruff`.
 - **Uzasadnienie**: Spełnienie kryteriów akceptacji Etapu 2 z ROADMAP.md: profil ma uzasadnienie i można jednoznacznie odtworzyć, z jakich danych powstał, a użytkownik ma pełną kontrolę i możliwość ręcznej modyfikacji wag i reguł.
+
+### 2026-11-14 — Wdrożenie Etapu 3 (Recommendation Engine, TMDB & Scoring)
+- **Decyzja / Zmiana**:
+  1. Zaimplementowano klienta `TMDBClient` (`app/integrations/tmdb.py`) z obsługą autoryzacji kluczem v3 oraz tokenem v4, throttlingiem (20 req/s), automatycznym ponawianiem z wykładniczym backoffem i hierarchią wyjątków `TMDBError`.
+  2. Zbudowano moduł `DiscoveryService` (`app/services/discovery.py`) pozyskujący pulę kandydatów z 4 strategii: 40% rekomendacje do ulubionych, 35% preferowane gatunki, 15% ulubieni twórcy, 10% eksploracja wysokiej jakości.
+  3. Wprowadzono `AntiRecommendationFilter` wykluczający pozycje obejrzane (`completed`, `watching`), znajdujące się na Plan to Watch, odrzucone w przeszłości oraz rekomendowane w ostatnich 28 dniach, wraz z wykluczaniem animacji w oparciu o antypreferencje i parametry zapytania.
+  4. Wdrożono wstępny ranking regułowy (`RuleBasedRanker`), selekcję top kandydatów (25 filmów, 15 seriali) i ocenę semantyczną LLM (`SemanticScorer`) z walidacją ustrukturyzowanego schematu Pydantic (`LLMEvaluationBatchResponse`).
+  5. Zaimplementowano `DiversificationService` ograniczający maks. 2 pozycje tego samego reżysera w przebiegu oraz finalną selekcję 10 filmów i 5 seriali.
+  6. Utworzono `RecommendationService` orkiestrujący przebiegi i transakcyjnie zapisujący do SQLite (`RecommendationRun`, `Recommendation`, `MediaItem`) oraz endpointy REST API: `POST /api/recommendation-runs`, `GET /api/recommendation-runs/{run_id}`, `GET /api/recommendation-runs`.
+  7. Rozszerzono testy automatyczne do **72 testów** (`pytest`) przechodzących w 100% oraz pełną zgodność lintera `ruff`.
+- **Uzasadnienie**: Spełnienie kryteriów akceptacji Etapu 3 z ROADMAP.md: system tworzy powtarzalne, weryfikowalne listy 10 filmów i 5 seriali bez duplikatów i z pełnymi uzasadnieniami, bez ingerencji w Simkl bez akceptacji użytkownika.
