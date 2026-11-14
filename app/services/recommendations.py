@@ -7,7 +7,11 @@ from typing import Dict, List, Optional, Set, Tuple
 from sqlalchemy import desc, select
 from sqlalchemy.orm import Session
 
-from app.core.errors import InvalidStateException, NotFoundException
+from app.core.errors import (
+    InvalidStateException,
+    NotFoundException,
+    UpstreamErrorException,
+)
 from app.integrations.llm.base import LLMProvider
 from app.integrations.llm.gemini import GeminiLLMClient
 from app.models.history import WatchHistory
@@ -422,6 +426,13 @@ class RecommendationService:
                 profile=profile_content,
                 exclude_genres=req.exclude_genres,
             )
+            if not candidates:
+                raise UpstreamErrorException(
+                    message=(
+                        "Nie udało się pobrać kandydatów z TMDB. "
+                        "Sprawdź połączenie z Internetem oraz konfigurację TMDB_API_KEY."
+                    )
+                )
 
             # 4. Anti-recommendation filtering
             anti_filter = AntiRecommendationFilter.load_from_db(
