@@ -61,11 +61,14 @@ data/
 
 ## Bezpieczeństwo i niezawodność
 
--   OAuth z PKCE, minimalne wymagane uprawnienia i bezpieczne
-    przechowywanie tokenów.
--   Nie loguj tokenów ani pełnych danych uwierzytelniających.
+-   OAuth z PKCE oraz wsparcie dla Device/PIN flow dla CLI/skryptów.
+-   Bezpieczne przechowywanie tokenów w `.env` i brak logowania sekretów.
+-   Limity Simkl API:
+    -   Maksymalnie 500 żądań dziennie (daily rate limit).
+    -   1 żądanie POST / sekundę.
+    -   10 żądań GET / sekundę.
 -   Zapis do Simkl tylko po jawnej akceptacji; operacje idempotentne.
--   Timeouty, retry z backoffem i obsługa limitów API.
+-   Timeouty, retry z backoffem i kolejkowanie z poszanowaniem limitów.
 -   Zachowuj surowe odpowiedzi tylko wtedy, gdy są potrzebne do
     diagnostyki; ogranicz dane osobowe.
 -   Testy adapterów z mockami oraz testy integracyjne na koncie
