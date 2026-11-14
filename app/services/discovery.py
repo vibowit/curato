@@ -97,9 +97,7 @@ class DiscoveryService:
             source_strategy=strategy,
         )
 
-    async def get_favorites_from_db(
-        self, db: Session, limit: int = 15
-    ) -> List[MediaItem]:
+    async def get_favorites_from_db(self, db: Session, limit: int = 15) -> List[MediaItem]:
         """Fetches user's top-rated or completed items with TMDB IDs from local database."""
         stmt = (
             select(MediaItem)

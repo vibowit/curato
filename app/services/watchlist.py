@@ -1,5 +1,5 @@
 import logging
-from typing import Optional
+from typing import List, Optional
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -17,6 +17,7 @@ from app.models.base import utc_now
 from app.models.history import WatchHistory
 from app.models.media import MediaItem
 from app.models.recommendation import Recommendation
+from app.schemas.decision import ApproveBatchResponse
 from app.schemas.sync import SimklWriteItemResult
 
 logger = logging.getLogger(__name__)
@@ -140,3 +141,175 @@ class WatchlistService:
             if isinstance(e, AppException):
                 raise e
             raise UpstreamErrorException(f"Failed to write to Simkl watchlist: {e}") from e
+
+    async def add_approved_recommendations(
+        self, recommendation_ids: List[int]
+    ) -> ApproveBatchResponse:
+        """
+        Batch adds approved recommendations to Simkl watchlist.
+
+        SAFETY INVARIANTS:
+        1. Explicit user approval is strictly required (status must be 'accepted').
+        2. Idempotent: items already 'added' are skipped without extra API calls.
+        3. Items not in 'accepted' status are rejected with an explanatory message.
+        """
+        results: List[SimklWriteItemResult] = []
+        to_add_movies: List[dict] = []
+        to_add_shows: List[dict] = []
+        to_process: List[tuple[Recommendation, MediaItem, str]] = []
+
+        added_count = 0
+        already_added_count = 0
+        failed_count = 0
+
+        # Phase 1: Validate and partition items
+        for rec_id in recommendation_ids:
+            rec = self.db.get(Recommendation, rec_id)
+            if not rec:
+                results.append(
+                    SimklWriteItemResult(
+                        success=False,
+                        media_type="movie",
+                        title=f"Unknown (ID {rec_id})",
+                        status="not_found",
+                        message=f"Recommendation with ID {rec_id} not found.",
+                    )
+                )
+                failed_count += 1
+                continue
+
+            media = self.db.get(MediaItem, rec.media_item_id)
+            media_title = media.title if media else f"Media {rec.media_item_id}"
+            m_type = media.media_type if media else "movie"
+
+            # Check if already added
+            if rec.status == "added":
+                results.append(
+                    SimklWriteItemResult(
+                        success=True,
+                        media_type=m_type,
+                        simkl_id=media.simkl_id if media else None,
+                        tmdb_id=media.tmdb_id if media else None,
+                        imdb_id=media.imdb_id if media else None,
+                        title=media_title,
+                        status="already_added",
+                        message="Item was already added to Simkl watchlist.",
+                    )
+                )
+                already_added_count += 1
+                continue
+
+            # Invariant: Must be explicitly accepted
+            if rec.status != "accepted":
+                results.append(
+                    SimklWriteItemResult(
+                        success=False,
+                        media_type=m_type,
+                        simkl_id=media.simkl_id if media else None,
+                        tmdb_id=media.tmdb_id if media else None,
+                        imdb_id=media.imdb_id if media else None,
+                        title=media_title,
+                        status="not_accepted",
+                        message=(
+                            f"Cannot add recommendation {rec_id} to Simkl. "
+                            f"Current status is '{rec.status}'. Explicit user approval is required."
+                        ),
+                    )
+                )
+                failed_count += 1
+                continue
+
+            # Prepare Simkl payload item
+            ids_dict = {}
+            if media and media.simkl_id:
+                ids_dict["simkl"] = media.simkl_id
+            if media and media.tmdb_id:
+                ids_dict["tmdb"] = media.tmdb_id
+            if media and media.imdb_id:
+                ids_dict["imdb"] = media.imdb_id
+
+            item_payload = {
+                "title": media.title if media else "Unknown",
+                "year": media.year if media else None,
+                "ids": ids_dict,
+                "to": "plantowatch",
+            }
+
+            if m_type == "movie":
+                to_add_movies.append(item_payload)
+            else:
+                to_add_shows.append(item_payload)
+
+            to_process.append((rec, media, m_type))
+
+        # Phase 2: Send to Simkl if any items require writing
+        if to_process:
+            try:
+                simkl_resp_movies = {}
+                simkl_resp_shows = {}
+
+                if to_add_movies:
+                    simkl_resp_movies = await self.simkl_client.add_to_list(
+                        media_type="movies", items=to_add_movies
+                    )
+                if to_add_shows:
+                    simkl_resp_shows = await self.simkl_client.add_to_list(
+                        media_type="shows", items=to_add_shows
+                    )
+
+                now = utc_now()
+                for rec, media, m_type in to_process:
+                    rec.status = "added"
+                    if media:
+                        history = self.db.scalar(
+                            select(WatchHistory).where(WatchHistory.media_item_id == media.id)
+                        )
+                        if not history:
+                            history = WatchHistory(
+                                media_item_id=media.id,
+                                status="plantowatch",
+                                synced_at=now,
+                            )
+                            self.db.add(history)
+                        else:
+                            history.status = "plantowatch"
+                            history.synced_at = now
+
+                    simkl_resp = simkl_resp_movies if m_type == "movie" else simkl_resp_shows
+                    results.append(
+                        SimklWriteItemResult(
+                            success=True,
+                            media_type=m_type,
+                            simkl_id=media.simkl_id if media else None,
+                            tmdb_id=media.tmdb_id if media else None,
+                            imdb_id=media.imdb_id if media else None,
+                            title=media.title if media else "Unknown",
+                            status="added",
+                            message="Successfully added to Simkl Plan to Watch.",
+                            simkl_response=simkl_resp,
+                        )
+                    )
+                    added_count += 1
+
+                self.db.commit()
+
+            except Exception as e:
+                self.db.rollback()
+                logger.exception("Failed bulk write to Simkl: %s", e)
+                if isinstance(e, SimklError):
+                    if e.code == "AUTH_REQUIRED":
+                        raise AuthRequiredException(message=e.message) from e
+                    if e.code == "RATE_LIMITED":
+                        raise RateLimitedException(message=e.message) from e
+                    raise UpstreamErrorException(message=e.message) from e
+                if isinstance(e, AppException):
+                    raise e
+                raise UpstreamErrorException(f"Failed to bulk write to Simkl watchlist: {e}") from e
+
+        return ApproveBatchResponse(
+            total_requested=len(recommendation_ids),
+            added_count=added_count,
+            already_added_count=already_added_count,
+            failed_count=failed_count,
+            items=results,
+        )

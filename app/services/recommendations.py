@@ -18,6 +18,7 @@ from app.schemas.recommendation import (
     CandidateItem,
     LLMEvaluationBatchResponse,
     LLMRecommendationEvaluation,
+    MediaItemSummary,
     RecommendationRead,
     RecommendationRunCreateRequest,
     RecommendationRunRead,
@@ -74,11 +75,11 @@ class AntiRecommendationFilter:
             (normalize_title(r[1]), r[2]) for r in history_rows if r[1]
         }
 
-        # 2. Rejected recommendations or decisions
+        # 2. Rejected recommendations or decisions (including items marked as seen)
         stmt_rejected_recs = (
             select(MediaItem.tmdb_id, MediaItem.title)
             .join(Recommendation, MediaItem.id == Recommendation.media_item_id)
-            .where(Recommendation.status == "rejected")
+            .where(Recommendation.status.in_(["rejected", "seen"]))
         )
         rejected_rec_rows = db.execute(stmt_rejected_recs).all()
 
@@ -86,7 +87,7 @@ class AntiRecommendationFilter:
             select(MediaItem.tmdb_id, MediaItem.title)
             .join(Recommendation, MediaItem.id == Recommendation.media_item_id)
             .join(UserDecision, Recommendation.id == UserDecision.recommendation_id)
-            .where(UserDecision.decision == "reject")
+            .where(UserDecision.decision.in_(["reject", "seen"]))
         )
         rejected_dec_rows = db.execute(stmt_rejected_decisions).all()
 
@@ -200,12 +201,7 @@ class RuleBasedRanker:
 
         total_score = max(
             0.0,
-            base_score
-            + genre_score
-            + theme_score
-            + director_score
-            + strat_score
-            - anti_penalty,
+            base_score + genre_score + theme_score + director_score + strat_score - anti_penalty,
         )
         return total_score
 
@@ -567,9 +563,12 @@ class RecommendationService:
             raise NotFoundException(f"Recommendation run #{run_id} not found.")
         return run
 
-    def list_runs(
-        self, db: Session, limit: int = 20, offset: int = 0
-    ) -> List[RecommendationRun]:
+    def get_latest_run(self, db: Session) -> Optional[RecommendationRun]:
+        """Retrieves the most recent recommendation run."""
+        stmt = select(RecommendationRun).order_by(desc(RecommendationRun.created_at)).limit(1)
+        return db.execute(stmt).scalar_one_or_none()
+
+    def list_runs(self, db: Session, limit: int = 20, offset: int = 0) -> List[RecommendationRun]:
         """Lists historical recommendation runs."""
         stmt = (
             select(RecommendationRun)
@@ -605,6 +604,31 @@ class RecommendationService:
                 except Exception:
                     pass
 
+            media_summary = None
+            if rec.media_item:
+                poster_path = None
+                if rec.media_item.metadata_json:
+                    try:
+                        meta = json.loads(rec.media_item.metadata_json)
+                        poster_path = meta.get("poster_path")
+                    except Exception:
+                        pass
+                media_summary = MediaItemSummary(
+                    id=rec.media_item.id,
+                    media_type=rec.media_item.media_type,
+                    title=rec.media_item.title,
+                    year=rec.media_item.year,
+                    tmdb_id=rec.media_item.tmdb_id,
+                    simkl_id=rec.media_item.simkl_id,
+                    imdb_id=rec.media_item.imdb_id,
+                    metadata_json=rec.media_item.metadata_json,
+                    poster_path=poster_path,
+                )
+
+            latest_decision = None
+            if getattr(rec, "decisions", None) and len(rec.decisions) > 0:
+                latest_decision = rec.decisions[-1].decision
+
             recommendations_read.append(
                 RecommendationRead(
                     id=rec.id,
@@ -616,8 +640,9 @@ class RecommendationService:
                     positive_factors=pos_factors,
                     risks=risks,
                     status=rec.status,
+                    latest_decision=latest_decision,
                     created_at=rec.created_at,
-                    media_item=rec.media_item,
+                    media_item=media_summary,
                 )
             )
 

@@ -1,3 +1,4 @@
+from app.services.decisions import DecisionService
 from app.services.discovery import DiscoveryService
 from app.services.recommendations import RecommendationService
 from app.services.sync import SyncService
@@ -10,4 +11,5 @@ __all__ = [
     "TasteService",
     "DiscoveryService",
     "RecommendationService",
+    "DecisionService",
 ]

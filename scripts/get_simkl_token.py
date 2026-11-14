@@ -2,9 +2,9 @@
 """Helper script to authorize and obtain Simkl User Access Token via modern Auth V2 Device Flow.
 
 Simkl Auth V2 uses standard OAuth 2.0 Device Authorization Grant (RFC 8628):
-1. POST https://api.simkl.com/oauth2/device with client_id.
+1. POST https://api.simkl.com/oauth2/device with client_id and scope (media:read media:write).
 2. User opens verification_uri (https://simkl.com/pin) and enters user_code.
-3. Script polls POST https://api.simkl.com/oauth2/token with client_id and client_secret until user approves.
+3. Script polls POST https://api.simkl.com/oauth2/token with client_id until user approves.
 4. Updates .env with SIMKL_USER_TOKEN and detects SIMKL_USERNAME.
 """
 
@@ -63,7 +63,11 @@ def main():
     env = load_env(env_path)
 
     client_id = env.get("SIMKL_CLIENT_ID") or os.environ.get("SIMKL_CLIENT_ID")
-    client_secret = env.get("SIMKL_CLIENT_SECRET") or env.get("SIMKL_USER_TOKEN") or os.environ.get("SIMKL_CLIENT_SECRET")
+    client_secret = (
+        env.get("SIMKL_CLIENT_SECRET")
+        or env.get("SIMKL_USER_TOKEN")
+        or os.environ.get("SIMKL_CLIENT_SECRET")
+    )
 
     if not client_id or client_id.startswith("your_"):
         print("❌ Błąd: SIMKL_CLIENT_ID nie jest ustawiony w pliku .env!")
@@ -72,11 +76,15 @@ def main():
 
     print("==================================================")
     print("🔑 Simkl OAuth 2.0 (Auth V2) Device Authorization")
+    print("   Zakres uprawnień (scopes): media:read media:write")
     print("==================================================")
     print("Pobieram kod urządzenia z Simkl API (POST /oauth2/device)...")
 
     device_url = "https://api.simkl.com/oauth2/device"
-    form_params = {"client_id": client_id}
+    form_params = {
+        "client_id": client_id,
+        "scope": "media:read media:write",
+    }
     form_data = urllib.parse.urlencode(form_params).encode("utf-8")
     req = urllib.request.Request(
         device_url,
@@ -165,7 +173,7 @@ def main():
                             username = user_obj.get("name") or str(user_obj.get("id"))
                             print(f"👤 Zalogowany użytkownik Simkl: {username}")
                     except Exception as ue:
-                        print(f"[Ostrzeżenie] Nie udało się automatycznie pobrać nazwy użytkownika ({ue})")
+                        print(f"[Ostrzeżenie] Nie udało się pobrać nazwy użytkownika ({ue})")
 
                     # Aktualizujemy .env
                     updates = {
@@ -176,7 +184,10 @@ def main():
                         updates["SIMKL_USERNAME"] = username
 
                     update_env_file(env_path, updates)
-                    print(f"✅ Zaktualizowano {env_path} (ustawiono SIMKL_USER_TOKEN i SIMKL_USERNAME).")
+                    print(
+                        f"✅ Zaktualizowano {env_path.name} "
+                        f"(ustawiono SIMKL_USER_TOKEN i SIMKL_USERNAME)."
+                    )
                     return
         except urllib.error.HTTPError as e:
             try:

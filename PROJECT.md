@@ -6,7 +6,7 @@ priority: P1
 category: dev
 created: "2026-11-06"
 updated: "2026-11-14"
-next_action: "Zrealizować Etap 4 (Panel i zatwierdzanie): rejestracja decyzji użytkownika (accept, reject, seen, later), idempotentny zapis zaakceptowanych do Simkl oraz prosty interfejs przeglądu propozycji"
+next_action: "Zrealizować Etap 5 (MCP i harmonogram): serwer MCP STDIO dla Antigravity, MCP HTTPS/Streamable dla ChatGPT oraz harmonogram cotygodniowego generowania propozycji"
 tags:
   - movie-recommendation
   - simkl
@@ -29,7 +29,7 @@ Jasno zdefiniowany cel końcowy projektu (MVP):
 - [x] Integracja z Simkl: autoryzacja, synchronizacja biblioteki/ocen/Plan to Watch, idempotentny zapis wyłącznie zaakceptowanych pozycji.
 - [x] Wersjonowany profil gustu użytkownika z możliwością ręcznej korekty.
 - [x] Silnik rekomendacji integrujący TMDB i LLM (10 filmów, 5 seriali na edycję) z uzasadnieniami i bez duplikatów.
-- [ ] Prosty interfejs użytkownika do przeglądu i zatwierdzania/odrzucania propozycji.
+- [x] Prosty interfejs użytkownika do przeglądu i zatwierdzania/odrzucania propozycji.
 - [ ] Serwer MCP (STDIO dla Antigravity, HTTPS dla ChatGPT) udostępniający te same serwisy domenowe.
 - [ ] Testy automatyczne (pokrycie kluczowych modułów > 80%, testy mockujące Simkl/TMDB/LLM).
 - [ ] Dokumentacja uruchomieniowa i szablon `.env.example`.
@@ -75,33 +75,42 @@ Jasno zdefiniowany cel końcowy projektu (MVP):
     - Zaimplementowano ranking regułowy (`RuleBasedRanker`), ocenę semantyczną LLM (`SemanticScorer`) z ustrukturyzowanym formatem JSON (`LLMEvaluationBatchResponse`: match_score, confidence, czynniki pozytywne, ryzyka, uzasadnienie) oraz serwis dywersyfikacji (`DiversificationService`) z limitem maks. 2 pozycji tego samego twórcy.
     - Zaimplementowano domenowy serwis `RecommendationService` orkiestrujący cały pipeline, transakcyjny zapis/upsert w SQLite (`MediaItem`, `RecommendationRun`, `Recommendation`) oraz endpointy REST API w `app/api/v1/recommendations.py` (`POST /api/recommendation-runs`, `GET /api/recommendation-runs/{run_id}`, `GET /api/recommendation-runs`).
     - Rozszerzono zestaw testów automatycznych do **72 testów** (`pytest`) przechodzących w 100% z pełną zgodnością lintera `ruff`.
+  - Zrealizowano i przetestowano **Etap 4 (Panel i zatwierdzanie)**:
+    - Zaimplementowano schematy Pydantic (`app/schemas/decision.py`) oraz rozszerzono `RecommendationRead` o `latest_decision` i `MediaItemSummary` o `poster_path`.
+    - Zaimplementowano `DecisionService` (`app/services/decisions.py`) do rejestracji decyzji (`accept`, `reject`, `seen`, `later`) z aktualizacją statusów i tabeli audytowej `user_decisions` oraz oznaczaniem pozycji `seen` w `watch_history`.
+    - Rozbudowano `WatchlistService` o metodę `add_approved_recommendations`: rygorystyczna weryfikacja statusu `accepted`, grupowanie na filmy i seriale, idempotentne pomijanie pozycji `added`, zapis do Simkl Plan to Watch i transakcyjna aktualizacja bazy.
+    - Wdrożono endpointy REST API (`app/api/v1/decisions.py`): `POST /api/recommendations/decisions`, `POST /api/recommendations/approve`, `GET /api/recommendations/decisions` oraz `GET /api/recommendations/latest`.
+    - Zbudowano nowoczesny, responsywny panel webowy SPA (`frontend/index.html`, `frontend/styles.css`, `frontend/app.js`) serwowany bezpośrednio przez FastAPI bez zewnętrznych zależności.
+    - Rozszerzono zestaw testów automatycznych do **86 testów** (`pytest`) przechodzących w 100% z pełną zgodnością lintera i formatera `ruff`.
 - **Kluczowe moduły**:
-  - `app/main.py` — fabryka aplikacji FastAPI, lifespan, middleware i obsługa błędów
+  - `app/main.py` — fabryka aplikacji FastAPI, serwowanie frontendu, lifespan, middleware i obsługa błędów
   - `app/core/` — konfiguracja Pydantic Settings, silnik bazy SQLite i logowanie
-  - `app/models/` — modele SQLAlchemy 2.0 (`media_items`, `watch_history`, `taste_profiles`, `recommendation_runs`, `recommendations`, itp.)
+  - `app/models/` — modele SQLAlchemy 2.0 (`media_items`, `watch_history`, `taste_profiles`, `recommendation_runs`, `recommendations`, `user_decisions`, itp.)
   - `app/integrations/simkl.py` — asynchroniczny klient API Simkl
   - `app/integrations/tmdb.py` — asynchroniczny klient API TMDB v3/v4
   - `app/integrations/llm/` — adaptery LLM (`LLMProvider`, `GeminiLLMClient`)
-  - `app/schemas/` — schematy Pydantic (`taste.py`, `recommendation.py`, `sync.py`)
+  - `app/schemas/` — schematy Pydantic (`taste.py`, `recommendation.py`, `sync.py`, `decision.py`)
   - `app/services/sync.py` — synchronizacja przyrostowa z Simkl do SQLite
   - `app/services/watchlist.py` — kontrolowany i idempotentny zapis pozycji do Simkl
   - `app/services/taste.py` — analiza historii, wersjonowanie profilu i ręczna korekta
   - `app/services/discovery.py` — zasilanie puli kandydatów z TMDB
   - `app/services/recommendations.py` — filtry anty-rekomendacji, ranking, ocena LLM, dywersyfikacja i rejestracja przebiegów
-  - `app/api/` — endpointy REST (w tym `/api/health`, `/api/sync/simkl`, `/api/profile`, `/api/recommendation-runs`)
+  - `app/services/decisions.py` — rejestracja decyzji użytkownika i historia
+  - `app/api/` — endpointy REST (w tym `/api/health`, `/api/sync/simkl`, `/api/profile`, `/api/recommendation-runs`, `/api/recommendations/*`)
+  - `frontend/` — lekki interfejs użytkownika (SPA HTML5 + CSS Grid + Vanilla JS)
   - `migrations/` — migracje bazy danych Alembic
   - `scripts/poc_taste_engine.py` — samodzielny skrypt badawczy PoC
   - `scripts/get_simkl_token.py` — asystent autoryzacji OAuth 2.0 Simkl Device Flow
-  - `tests/` — testy jednostkowe i integracyjne (72 testy)
+  - `tests/` — testy jednostkowe i integracyjne (86 testów)
   - `data/` — lokalna baza SQLite i pliki wyjściowe
 
 ## Najbliższy Krok (Next Action)
 
-> Zrealizować Etap 4 (Panel i zatwierdzanie): rejestracja decyzji użytkownika (`accept`, `reject`, `seen`, `later`), idempotentny zapis zaakceptowanych do Simkl oraz prosty interfejs przeglądu propozycji.
+> Zrealizować Etap 5 (MCP i harmonogram): serwer MCP STDIO dla Antigravity, MCP HTTPS/Streamable dla ChatGPT oraz harmonogram cotygodniowego generowania propozycji.
 
 ## Blokady (Blockers)
 
-Brak. Silnik rekomendacji integrujący TMDB i LLM w pełni zaimplementowany i przetestowany.
+Brak. Panel użytkownika, rejestracja decyzji i kontrolowane dodawanie do Simkl w pełni zaimplementowane i przetestowane.
 
 ## Backlog Zadań
 
@@ -135,14 +144,15 @@ Brak. Silnik rekomendacji integrujący TMDB i LLM w pełni zaimplementowany i pr
 - [x] Dywersyfikacja wyników i rejestracja przebiegu w bazie
 
 ### Etap 4: Panel i zatwierdzanie
-- [ ] Minimalny UI do przeglądu propozycji
-- [ ] Rejestracja decyzji użytkownika (`accept`, `reject`, `seen`, `later`)
-- [ ] Idempotentne, kontrolowane dodawanie zaakceptowanych pozycji do Simkl
-- [ ] Historia przebiegów i decyzji
+- [x] Minimalny UI do przeglądu propozycji
+- [x] Rejestracja decyzji użytkownika (`accept`, `reject`, `seen`, `later`)
+- [x] Idempotentne, kontrolowane dodawanie zaakceptowanych pozycji do Simkl
+- [x] Historia przebiegów i decyzji
 
 ### Etap 5: MCP i harmonogram
 - [ ] Narzędzia MCP STDIO dla Antigravity
 - [ ] MCP HTTPS/Streamable dla ChatGPT
+- [ ] Scheduler dla cotygodniowego generowania propozycji
 - [ ] Scheduler dla cotygodniowego generowania propozycji
 
 ## Rejestr Decyzji (ADR)
@@ -207,3 +217,18 @@ Brak. Silnik rekomendacji integrujący TMDB i LLM w pełni zaimplementowany i pr
   6. Utworzono `RecommendationService` orkiestrujący przebiegi i transakcyjnie zapisujący do SQLite (`RecommendationRun`, `Recommendation`, `MediaItem`) oraz endpointy REST API: `POST /api/recommendation-runs`, `GET /api/recommendation-runs/{run_id}`, `GET /api/recommendation-runs`.
   7. Rozszerzono testy automatyczne do **72 testów** (`pytest`) przechodzących w 100% oraz pełną zgodność lintera `ruff`.
 - **Uzasadnienie**: Spełnienie kryteriów akceptacji Etapu 3 z ROADMAP.md: system tworzy powtarzalne, weryfikowalne listy 10 filmów i 5 seriali bez duplikatów i z pełnymi uzasadnieniami, bez ingerencji w Simkl bez akceptacji użytkownika.
+
+### 2026-11-14 — Wdrożenie Etapu 4 (Panel i zatwierdzanie)
+- **Decyzja / Zmiana**:
+  1. Zdefiniowano i zaimplementowano schematy Pydantic (`app/schemas/decision.py`) dla operacji jednostkowych i zbiorczych: `SingleDecisionRequest`, `DecisionBatchRequest`, `UserDecisionRead`, `DecisionBatchResponse`, `ApproveBatchRequest`, `ApproveBatchResponse`.
+  2. Rozszerzono `RecommendationRead` o `latest_decision` oraz `MediaItemSummary` o `poster_path`.
+  3. Zaimplementowano domenowy serwis `DecisionService` (`app/services/decisions.py`) do rejestracji decyzji (`accept`, `reject`, `seen`, `later`), aktualizacji statusów w tabeli `recommendations`, audytu w tabeli `user_decisions` oraz aktualizacji lokalnej historii (`watch_history(status='completed')` dla decyzji `seen`).
+  4. Rozbudowano `WatchlistService` (`app/services/watchlist.py`) o metodę `add_approved_recommendations`:
+     - egzekwowanie nienegocjowalnej reguły bezpieczeństwa: dozwolony zapis wyłącznie pozycji o statusie `accepted`,
+     - pełna idempotencja: pozycje o statusie `added` są raportowane jako `already_added` bez wywoływania API Simkl,
+     - optymalizacja zapisu: automatyczne rozdzielanie pozycji na filmy (`movies`) i seriale (`shows`) oraz batching do Simkl `add-to-list`.
+  5. Dodano dedykowane endpointy REST API w `app/api/v1/decisions.py`: `POST /api/recommendations/decisions`, `POST /api/recommendations/approve`, `GET /api/recommendations/decisions` oraz `GET /api/recommendations/latest`.
+  6. Rozszerzono `AntiRecommendationFilter` o wykluczanie z kolejnych rekomendacji pozycji, dla których zarejestrowano decyzję `seen` lub status `seen`.
+  7. Zaimplementowano nowoczesny, responsywny panel webowy (SPA w HTML5 + CSS Grid + Vanilla JS) w katalogu `frontend/`, serwowany bezpośrednio przez FastAPI bez zewnętrznych zależności.
+  8. Rozszerzono zestaw testów automatycznych do **86 testów** (`pytest`) przechodzących w 100% oraz pełną zgodność lintera i formatera `ruff`.
+- **Uzasadnienie**: Spełnienie kryteriów akceptacji Etapu 4 z ROADMAP.md: pełny przepływ od listy propozycji do Plan to Watch działa bez automatycznego zapisu, z pełną kontrolą użytkownika i audytem decyzji.

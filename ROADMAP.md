@@ -53,13 +53,13 @@ i z uzasadnieniami. (Ukończono pomyślnie)
 
 ## Etap 4 -- panel i zatwierdzanie
 
--   [ ] Lista rekomendacji.
--   [ ] Decyzje: zaakceptuj, odrzuć, już widziałem, później.
--   [ ] Zbiorcze dodawanie zaakceptowanych do Simkl.
--   [ ] Historia przebiegów i decyzji.
+-   [x] Lista rekomendacji.
+-   [x] Decyzje: zaakceptuj, odrzuć, już widziałem, później.
+-   [x] Zbiorcze dodawanie zaakceptowanych do Simkl.
+-   [x] Historia przebiegów i decyzji.
 
 **Akceptacja:** pełny przepływ od listy do Plan to Watch działa bez
-automatycznego zapisu.
+automatycznego zapisu. (Ukończono pomyślnie)
 
 ## Etap 5 -- MCP i harmonogram
 

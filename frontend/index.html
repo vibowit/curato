@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Simkl Taste & Recommendation Engine</title>
+  <link rel="stylesheet" href="/styles.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+  <!-- Header / Navbar -->
+  <header class="header">
+    <div class="header-container">
+      <div class="brand">
+        <span class="brand-icon">🎬</span>
+        <div>
+          <h1 class="brand-title">Simkl Recommender</h1>
+          <p class="brand-subtitle">Prywatny silnik rekomendacji filmów i seriali</p>
+        </div>
+      </div>
+      <div class="header-actions">
+        <div id="profile-pill" class="badge badge-profile">Profil: Ładowanie...</div>
+        <button id="btn-sync" class="btn btn-secondary">
+          <span class="icon">🔄</span> Sync Simkl
+        </button>
+        <button id="btn-new-run" class="btn btn-primary">
+          <span class="icon">✨</span> Nowa Edycja
+        </button>
+        <button id="btn-history" class="btn btn-secondary">
+          <span class="icon">📜</span> Historia Decyzji
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Content -->
+  <main class="container">
+    <!-- Run Info & Filter Toolbar -->
+    <section class="toolbar-section">
+      <div class="run-selector-row">
+        <label for="run-select" class="form-label">Edycja rekomendacji:</label>
+        <select id="run-select" class="select-input">
+          <option value="">Ładowanie wygenerowanych edycji...</option>
+        </select>
+        <span id="run-meta-status" class="badge">Status</span>
+      </div>
+
+      <div id="run-summary-box" class="run-summary-card">
+        <div class="summary-header">
+          <span id="summary-meta" class="summary-meta">Edycja: - | Model: - | Data: -</span>
+        </div>
+        <p id="summary-text" class="summary-text">Wybierz lub wygeneruj edycję rekomendacji.</p>
+      </div>
+
+      <!-- Filters -->
+      <div class="filters-bar">
+        <div class="filter-group">
+          <span class="filter-label">Typ:</span>
+          <button class="chip active" data-type-filter="all">Wszystkie</button>
+          <button class="chip" data-type-filter="movie">Filmy</button>
+          <button class="chip" data-type-filter="show">Seriale</button>
+        </div>
+        <div class="filter-group">
+          <span class="filter-label">Status:</span>
+          <button class="chip active" data-status-filter="all">Wszystkie</button>
+          <button class="chip" data-status-filter="pending">Do decyzji</button>
+          <button class="chip" data-status-filter="accepted">Zaakceptowane</button>
+          <button class="chip" data-status-filter="added">W Simkl</button>
+          <button class="chip" data-status-filter="rejected">Odrzucone</button>
+          <button class="chip" data-status-filter="seen">Obejrzane</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Recommendations Grid -->
+    <section id="recommendations-container" class="cards-grid">
+      <div class="loading-state">
+        <div class="spinner"></div>
+        <p>Ładowanie rekomendacji...</p>
+      </div>
+    </section>
+  </main>
+
+  <!-- Sticky Bottom Bar for Simkl Approval -->
+  <aside id="approval-bar" class="approval-bar hidden">
+    <div class="approval-content">
+      <div class="approval-info">
+        <span class="icon">✅</span>
+        <div>
+          <strong id="approved-count-text">0 pozycji zaakceptowanych</strong>
+          <p class="subtext">Gotowe do bezpiecznego i idempotentnego dodania do Plan to Watch w Simkl.</p>
+        </div>
+      </div>
+      <button id="btn-submit-approve" class="btn btn-success btn-lg">
+        🚀 Wyślij zaakceptowane do Simkl
+      </button>
+    </div>
+  </aside>
+
+  <!-- Modal: Nowa Edycja -->
+  <div id="modal-new-run" class="modal-overlay hidden">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <h3>Generowanie nowej edycji rekomendacji</h3>
+        <button class="modal-close" data-close-modal>&times;</button>
+      </div>
+      <form id="form-new-run" class="modal-body">
+        <div class="form-group">
+          <label for="input-movie-limit">Liczba filmów (domyślnie 10):</label>
+          <input type="number" id="input-movie-limit" class="input" value="10" min="1" max="50">
+        </div>
+        <div class="form-group">
+          <label for="input-show-limit">Liczba seriali (domyślnie 5):</label>
+          <input type="number" id="input-show-limit" class="input" value="5" min="1" max="25">
+        </div>
+        <div class="form-group">
+          <label for="input-exclude-animation" class="checkbox-label">
+            <input type="checkbox" id="input-exclude-animation" checked>
+            Wyklucz animacje (zgodnie z preferencjami gustu)
+          </label>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-close-modal>Anuluj</button>
+          <button type="submit" id="btn-submit-run" class="btn btn-primary">Uruchom generowanie</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal: Historia Decyzji -->
+  <div id="modal-history" class="modal-overlay hidden">
+    <div class="modal-dialog modal-lg">
+      <div class="modal-header">
+        <h3>Historia decyzji użytkownika</h3>
+        <button class="modal-close" data-close-modal>&times;</button>
+      </div>
+      <div class="modal-body">
+        <div id="history-table-container">
+          <p class="loading-text">Ładowanie historii...</p>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-close-modal>Zamknij</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Container -->
+  <div id="toast-container" class="toast-container"></div>
+
+  <script src="/app.js"></script>
+</body>
+</html>

@@ -77,6 +77,7 @@ class MediaItemSummary(BaseModel):
     simkl_id: Optional[int] = None
     imdb_id: Optional[str] = None
     metadata_json: Optional[str] = None
+    poster_path: Optional[str] = None
 
     model_config = {"from_attributes": True}
 
@@ -93,6 +94,7 @@ class RecommendationRead(BaseModel):
     positive_factors: List[str] = Field(default_factory=list)
     risks: List[str] = Field(default_factory=list)
     status: str
+    latest_decision: Optional[str] = None
     created_at: datetime
     media_item: Optional[MediaItemSummary] = None
 

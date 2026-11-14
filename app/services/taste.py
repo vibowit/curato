@@ -213,9 +213,7 @@ class TasteService:
 
         # Deactivate all existing profiles atomically
         existing_profiles = (
-            db.execute(select(TasteProfile).where(TasteProfile.active.is_(True)))
-            .scalars()
-            .all()
+            db.execute(select(TasteProfile).where(TasteProfile.active.is_(True))).scalars().all()
         )
         for p in existing_profiles:
             p.active = False
@@ -351,9 +349,9 @@ class TasteService:
             return target
 
         # Deactivate any currently active profile
-        current_actives = db.execute(
-            select(TasteProfile).where(TasteProfile.active.is_(True))
-        ).scalars().all()
+        current_actives = (
+            db.execute(select(TasteProfile).where(TasteProfile.active.is_(True))).scalars().all()
+        )
         for p in current_actives:
             p.active = False
 

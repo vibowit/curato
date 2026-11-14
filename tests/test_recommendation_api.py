@@ -91,12 +91,15 @@ def test_create_and_get_recommendation_run(app_client: TestClient, db_session: S
         ]
     }
 
-    with patch(
-        "app.services.discovery.DiscoveryService.discover_candidates",
-        new=AsyncMock(return_value=mock_candidates),
-    ), patch(
-        "app.integrations.llm.gemini.GeminiLLMClient.generate_structured",
-        new=AsyncMock(return_value=mock_llm_output),
+    with (
+        patch(
+            "app.services.discovery.DiscoveryService.discover_candidates",
+            new=AsyncMock(return_value=mock_candidates),
+        ),
+        patch(
+            "app.integrations.llm.gemini.GeminiLLMClient.generate_structured",
+            new=AsyncMock(return_value=mock_llm_output),
+        ),
     ):
         res = app_client.post(
             "/api/recommendation-runs",

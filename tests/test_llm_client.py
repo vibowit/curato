@@ -35,13 +35,7 @@ async def test_gemini_client_success():
 
         response_payload = {
             "candidates": [
-                {
-                    "content": {
-                        "parts": [
-                            {"text": f"```json\n{json.dumps(expected_result)}\n```"}
-                        ]
-                    }
-                }
+                {"content": {"parts": [{"text": f"```json\n{json.dumps(expected_result)}\n```"}]}}
             ]
         }
         return httpx.Response(200, json=response_payload)
@@ -117,11 +111,7 @@ async def test_gemini_client_invalid_json():
     def mock_handler(request: httpx.Request):
         return httpx.Response(
             200,
-            json={
-                "candidates": [
-                    {"content": {"parts": [{"text": "Not a valid json at all!"}]}}
-                ]
-            },
+            json={"candidates": [{"content": {"parts": [{"text": "Not a valid json at all!"}]}}]},
         )
 
     mock_client = httpx.AsyncClient(transport=httpx.MockTransport(mock_handler))

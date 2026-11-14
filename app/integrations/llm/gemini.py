@@ -118,14 +118,12 @@ class GeminiLLMClient:
         }
 
         if system_instruction:
-            payload["systemInstruction"] = {
-                "parts": [{"text": system_instruction}]
-            }
+            payload["systemInstruction"] = {"parts": [{"text": system_instruction}]}
 
         # Try designated model, and fall back to alternatives if model not found (404)
-        models_to_try: List[Tuple[str, str]] = [
-            (self._model, "v1beta")
-        ] + [(m, "v1beta") for m in self.DEFAULT_MODELS if m != self._model]
+        models_to_try: List[Tuple[str, str]] = [(self._model, "v1beta")] + [
+            (m, "v1beta") for m in self.DEFAULT_MODELS if m != self._model
+        ]
         last_error: Optional[str] = None
 
         client = self._get_client()
