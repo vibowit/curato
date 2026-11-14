@@ -38,6 +38,12 @@ sam decyduje, co dodać do Simkl.
 -   MCP dla Antigravity i ChatGPT.
 -   Cotygodniowe uruchomienie i generowanie na żądanie.
 
+## Kolejne rozszerzenia (Next Milestones)
+
+-   Podgląd oficjalnych zwiastunów (trailers z TMDB / YouTube) bezpośrednio w panelu rekomendacji przed podjęciem decyzji.
+-   Konteneryzacja i wdrożenie jako stała, bezobsługowa usługa domowa w środowisku Proxmox VE (Docker Compose, montowanie wolumenu danych, restart-policy).
+-   Przygotowanie projektu do upublicznienia na GitHubie (Open-Source) oraz zautomatyzowana publikacja oficjalnych obrazów na Docker Hub.
+
 ## Poza zakresem MVP
 
 Dostępność streamingowa, własny katalog filmów, trenowanie ML,

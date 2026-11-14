@@ -6,7 +6,7 @@ priority: P1
 category: dev
 created: "2026-11-06"
 updated: "2026-11-14"
-next_action: "Przeprowadzić weryfikację integracji MCP na żywo w Antigravity/ChatGPT oraz zaplanować funkcje po-MVP (powiadomienia Pushover, analiza zmian gustu)"
+next_action: "Zrealizować Etap 6 (Zwiastuny i optymalizacja współbieżności bazy WAL) lub Etap 7 (Konteneryzacja pod Proxmox) wg ustalonego planu"
 tags:
   - movie-recommendation
   - simkl
@@ -113,7 +113,7 @@ Jasno zdefiniowany cel końcowy projektu (MVP):
 
 ## Najbliższy Krok (Next Action)
 
-> Przeprowadzić weryfikację integracji MCP na żywo w Antigravity/ChatGPT oraz zaplanować funkcje po-MVP (powiadomienia Pushover, analiza zmian gustu).
+> Zrealizować Etap 6 (Zwiastuny i optymalizacja współbieżności bazy WAL) lub Etap 7 (Konteneryzacja pod Proxmox) wg ustalonego planu.
 
 ## Blokady (Blockers)
 
@@ -161,6 +161,34 @@ Brak. Wszystkie etapy MVP (PoC, 0, 1, 2, 3, 4, 5) są w pełni zaimplementowane 
 - [x] MCP HTTPS/Streamable dla ChatGPT (`/mcp/sse`, `/mcp/messages/`, `MCPAuthMiddleware`)
 - [x] Scheduler dla cotygodniowego generowania propozycji (`app/core/scheduler.py`, `app/api/v1/scheduler.py`)
 - [x] Monitoring i endpointy zarządzania harmonogramem
+
+### Etap 6: Zwiastuny i optymalizacja współbieżności
+- [ ] Integracja TMDB Videos (`/movie/{id}/videos`, `/tv/{id}/videos`) w kliencie TMDB
+- [ ] Rozszerzenie schematów i metadanych `MediaItem` o `trailer_url` / `trailer_key`
+- [ ] Interfejs UI: przycisk zwiastuna i modal z osadzonym odtwarzaczem YouTube (`youtube-nocookie`) oraz fallback wyszukiwania
+- [ ] Optymalizacja współbieżności SQLite pod usługę 24/7 (`PRAGMA journal_mode=WAL;`, `PRAGMA busy_timeout=5000;`)
+- [ ] Zrównoleglenie odpytywania TMDB w `discovery.py` (`asyncio.gather` z semaforem)
+
+### Etap 7: Konteneryzacja i wdrożenie na Proxmox
+- [ ] Wieloetapowy `Dockerfile` (Python 3.11-slim, użytkownik nieuprzywilejowany `appuser`, healthcheck `/api/health`)
+- [ ] Skrypt startowy `entrypoint.sh` automatycznie wykonujący migracje `alembic upgrade head` przed startem `uvicorn`
+- [ ] Konfiguracja `docker-compose.yml` z trwałym montowaniem wolumenu `./data:/app/data`, restart policy i zmiennymi `.env`
+- [ ] Procedura wdrożenia na Proxmox VE (kontener LXC Debian z Dockerem, kopie zapasowe wolumenu w PBS/VZDump)
+- [ ] Konfiguracja Reverse Proxy (Nginx Proxy Manager / Caddy) z certyfikatem SSL pod bezpieczny dostęp zdalny i MCP SSE dla ChatGPT
+
+### Etap 8: Przygotowanie do upublicznienia (GitHub) i publikacja na Docker Hub
+- [ ] Audyt bezpieczeństwa repozytorium: weryfikacja `.gitignore`, brak sekretów w historii git, szablony `.env.example`
+- [ ] Profesjonalna dokumentacja `README.md` (architektura, badges, instrukcja szybkiego startu Docker Compose, konfiguracja Simkl/TMDB/Gemini)
+- [ ] Dodanie plików Open-Source: licencja MIT, `CONTRIBUTING.md`, szablony zgłoszeń GitHub Issues
+- [ ] Konfiguracja GitHub Actions CI/CD:
+  - automatyczny lint (`ruff`) i testy (`pytest`) przy Pull Requestach i commitach
+  - automatyczny build wieloarchitektonicznego obrazu (`linux/amd64`, `linux/arm64`) i publikacja wydań na Docker Hub
+
+### Przyszłe rozszerzenia (Future Backlog)
+- [ ] Powiadomienia Pushover / Telegram o wygenerowaniu nowej edycji przez scheduler
+- [ ] Analiza wektorowa i embeddingi preferencji
+- [ ] Analiza ewolucji gustu użytkownika w czasie
+- [ ] Alternatywni dostawcy LLM i dodatkowe źródła metadanych
 
 ## Rejestr Decyzji (ADR)
 
@@ -255,3 +283,10 @@ Brak. Wszystkie etapy MVP (PoC, 0, 1, 2, 3, 4, 5) są w pełni zaimplementowane 
      - Dodano endpointy REST w `app/api/v1/scheduler.py` (`GET /api/scheduler/status`, `POST /api/scheduler/trigger`).
   4. Rozszerzono zestaw testów automatycznych do **103 testów** (`pytest`) z wynikiem 100% sukcesu oraz pełną czystością lintera `ruff`.
 - **Uzasadnienie**: Spełnienie kryteriów akceptacji Etapu 5 z ROADMAP.md: oba interfejsy (lokalny STDIO dla Antigravity oraz zdalny SSE dla ChatGPT) korzystają z tych samych serwisów domenowych, tej samej bazy SQLite i tego samego profilu gustu bez duplikowania logiki.
+
+### 2026-11-14 — Definicja etapów po-MVP: Zwiastuny, Proxmox oraz Open-Source / Docker Hub
+- **Decyzja / Zmiana**:
+  1. Zaplanowano **Etap 6 (Zwiastuny i optymalizacja współbieżności bazy WAL)**: integracja TMDB Videos (`/movie/{id}/videos`, `/tv/{id}/videos`), modal odtwarzacza YouTube (`youtube-nocookie`) bezpośrednio w panelu webowym, zrównoleglenie pobierania kandydatów TMDB (`asyncio.gather`) oraz włączenie trybu SQLite WAL (`PRAGMA journal_mode=WAL;`, `PRAGMA busy_timeout=5000;`) pod kątem stabilnej pracy 24/7.
+  2. Zaplanowano **Etap 7 (Konteneryzacja i wdrożenie na Proxmox)**: wieloetapowy `Dockerfile` z użytkownikiem nieuprzywilejowanym, skrypt startowy `entrypoint.sh` wykonujący automatyczne migracje `alembic upgrade head`, konfiguracja `docker-compose.yml` z wolumenem danych bazy oraz procedura uruchomienia w kontenerze LXC Debian z Dockerem pod Proxmox VE.
+  3. Zaplanowano **Etap 8 (Przygotowanie repozytorium do upublicznienia na GitHub i Docker Hub)**: audyt bezpieczeństwa sekretów, profesjonalna dokumentacja `README.md`, licencja MIT, szablony GitHub oraz workflow GitHub Actions CI/CD automatycznie testujący kod i publikujący wieloarchitektoniczne obrazy na Docker Hub.
+- **Uzasadnienie**: Ustalenie jasnego planu przejścia projektu z fazy lokalnego MVP do niezawodnej, stale działającej domowej mikro-usługi na Proxmoxie oraz publicznego projektu Open Source.

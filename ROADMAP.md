@@ -72,7 +72,40 @@ automatycznego zapisu. (Ukończono pomyślnie)
 **Akceptacja:** oba interfejsy korzystają z tego samego profilu i
 historii. (Ukończono pomyślnie)
 
-## Po MVP
+## Etap 6 -- Zwiastuny i optymalizacja współbieżności
 
-Embeddingi, bardziej zaawansowana personalizacja, analiza zmian gustu,
-powiadomienia Pushover i dodatkowe źródła metadanych.
+-   [ ] Rozszerzenie klienta TMDB o pobieranie wideo zwiastunów (`/movie/{id}/videos`, `/tv/{id}/videos`).
+-   [ ] Dodanie pól `trailer_url` / `trailer_key` do schematów rekomendacji i metadanych `MediaItem`.
+-   [ ] Interfejs UI: przycisk zwiastuna i modal z osadzonym odtwarzaczem YouTube (`youtube-nocookie`) bezpośrednio na karcie propozycji (oraz fallback do wyszukiwania).
+-   [ ] Optymalizacja SQLite: włączenie trybu WAL (`PRAGMA journal_mode=WAL;`) oraz `PRAGMA busy_timeout=5000;` dla bezkolizyjnej pracy 24/7.
+-   [ ] Zrównoleglenie pobierania kandydatów w TMDB Discovery (`asyncio.gather` z semaforem) w celu skrócenia czasu generowania rekomendacji.
+
+**Akceptacja:** Użytkownik może obejrzeć zwiastun prosto z karty przed podjęciem decyzji; operacje zapisu i odczytu nie blokują bazy SQLite.
+
+## Etap 7 -- Konteneryzacja i wdrożenie na Proxmox
+
+-   [ ] Wieloetapowy `Dockerfile` (Python 3.11-slim, użytkownik nieuprzywilejowany `appuser`, healthcheck `/api/health`).
+-   [ ] Skrypt startowy `entrypoint.sh` automatycznie wykonujący `alembic upgrade head` przed uruchomieniem `uvicorn`.
+-   [ ] Konfiguracja `docker-compose.yml` z trwałym montowaniem wolumenu `./data:/app/data`, polityką `restart: unless-stopped` i zarządzaniem zmiennymi `.env`.
+-   [ ] Dokumentacja i procedura wdrożenia na Proxmox VE (kontener LXC Debian z Dockerem, ochrona bazy w backupach Proxmox/PBS).
+-   [ ] Wskazówki konfiguracji Reverse Proxy (Nginx Proxy Manager / Caddy / Cloudflare Tunnel) z HTTPS pod bezpieczny serwer MCP SSE dla ChatGPT.
+
+**Akceptacja:** Aplikacja działa jako stała, stabilna usługa kontenerowa w środowisku Proxmox, migracje wykonują się bezobsługowo przy starcie, a dane są bezpiecznie persystowane.
+
+## Etap 8 -- Przygotowanie do upublicznienia (GitHub) i publikacja na Docker Hub
+
+-   [ ] Audyt bezpieczeństwa repozytorium: weryfikacja `.gitignore`, upewnienie się o braku sekretów w historii git, szablony `.env.example`.
+-   [ ] Profesjonalna dokumentacja `README.md` (opis projektu, badges, architektura, instrukcja szybkiego startu Docker Compose, konfiguracja Simkl/TMDB/Gemini).
+-   [ ] Dodanie plików Open-Source: plik licencji (np. MIT), `CONTRIBUTING.md`, szablon zgłaszania problemów (issue template).
+-   [ ] Przygotowanie workflow GitHub Actions CI/CD:
+    - automatyczne testy (`pytest`) i lint (`ruff`) przy Pull Requestach i commitach do `main`,
+    - automatyczny build wieloplatformowego obrazu kontenera (`linux/amd64`, `linux/arm64`) i publikacja wydań (release tags) na Docker Hub (oraz opcjonalnie GHCR).
+
+**Akceptacja:** Czyste, w pełni udokumentowane repozytorium gotowe do publikacji jako projekt Open Source na GitHubie, ze zautomatyzowanym procesem wydawniczym obrazu na Docker Hub.
+
+## Przyszłe rozszerzenia (Future Backlog)
+
+-   Powiadomienia Pushover / Telegram o wygenerowaniu nowej edycji przez scheduler.
+-   Embeddingi i analiza wektorowa podobieństwa pozycji.
+-   Analiza zmian i ewolucji gustu użytkownika w czasie.
+-   Dodatkowe źródła metadanych i alternatywni dostawcy LLM.
