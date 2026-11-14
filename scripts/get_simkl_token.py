@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
-"""Helper script to authorize and obtain Simkl User Access Token via PIN flow.
+"""Helper script to authorize and obtain Simkl User Access Token via modern Auth V2 Device Flow.
 
-Simkl supports a device PIN authorization flow:
-1. Request a user PIN from https://api.simkl.com/oauth/pin?client_id=...
-2. User opens the verification URL in browser and clicks 'Authorize'.
-3. Script polls the check endpoint and retrieves the actual `access_token`.
+Simkl Auth V2 uses standard OAuth 2.0 Device Authorization Grant (RFC 8628):
+1. POST https://api.simkl.com/oauth2/device with client_id.
+2. User opens verification_uri (https://simkl.com/pin) and enters user_code (or opens verification_url).
+3. Script polls POST https://api.simkl.com/oauth2/token until user approves.
+4. Updates .env with SIMKL_USER_TOKEN and detects SIMKL_USERNAME.
 """
 
 import json
@@ -68,77 +69,104 @@ def main():
         sys.exit(1)
 
     print("==================================================")
-    print("🔑 Simkl OAuth PIN Authorization Helper")
+    print("🔑 Simkl OAuth 2.0 (Auth V2) Device Authorization")
     print("==================================================")
-    print("Pobieram kod autoryzacji PIN z Simkl API...")
+    print("Pobieram kod urządzenia z Simkl API (POST /oauth2/device)...")
 
-    pin_init_url = f"https://api.simkl.com/oauth/pin?client_id={client_id}"
+    device_url = "https://api.simkl.com/oauth2/device"
+    form_data = urllib.parse.urlencode({"client_id": client_id}).encode("utf-8")
     req = urllib.request.Request(
-        pin_init_url,
-        headers={"Content-Type": "application/json", "simkl-api-key": client_id},
+        device_url,
+        data=form_data,
+        headers={
+            "Content-Type": "application/x-www-form-urlencoded",
+            "simkl-api-key": client_id,
+            "User-Agent": "PersonalMovieRecommender/0.1.0",
+        },
+        method="POST",
     )
 
     try:
         with urllib.request.urlopen(req, timeout=15) as resp:
             data = json.loads(resp.read().decode("utf-8"))
+    except urllib.error.HTTPError as e:
+        err_body = e.read().decode("utf-8")
+        print(f"❌ Błąd połączenia z Simkl API: HTTP {e.code} - {err_body}")
+        sys.exit(1)
     except Exception as e:
         print(f"❌ Błąd połączenia z Simkl API: {e}")
         sys.exit(1)
 
+    device_code = data.get("device_code")
     user_code = data.get("user_code")
-    verification_url = data.get("verification_url", f"https://simkl.com/pin/{user_code}")
+    verification_uri = data.get("verification_uri", "https://simkl.com/pin")
+    verification_url = data.get("verification_url", f"{verification_uri}?code={user_code}")
     expires_in = data.get("expires_in", 900)
-    interval = data.get("interval", 5)
+    interval = max(data.get("interval", 5), 5)
 
-    print("\n👉 Otwórz poniższy link w swojej przeglądarce i kliknij 'Authorize':")
-    print(f"   {verification_url}\n")
-    print(f"(Kod PIN: {user_code}, wygasa za {expires_in // 60} minut)")
-    print("Oczekuję na potwierdzenie w przeglądarce", end="", flush=True)
+    print("\n👉 Otwórz poniższy link w swojej przeglądarce i zatwierdź aplikację:")
+    print(f"   {verification_url}")
+    print(f"\n(Kod PIN / user code: {user_code})")
+    print(f"Kod wygasa za {expires_in // 60} minut.")
+    print("\nOczekuję na potwierdzenie w przeglądarce", end="", flush=True)
 
-    check_url = f"https://api.simkl.com/oauth/pin/{user_code}?client_id={client_id}"
+    token_url = "https://api.simkl.com/oauth2/token"
     start_time = time.time()
 
     while time.time() - start_time < expires_in:
         time.sleep(interval)
         print(".", end="", flush=True)
 
-        check_req = urllib.request.Request(
-            check_url,
-            headers={"Content-Type": "application/json", "simkl-api-key": client_id},
+        token_params = {
+            "grant_type": "urn:ietf:params:oauth:grant-type:device_code",
+            "client_id": client_id,
+            "device_code": device_code,
+        }
+        token_data = urllib.parse.urlencode(token_params).encode("utf-8")
+        token_req = urllib.request.Request(
+            token_url,
+            data=token_data,
+            headers={
+                "Content-Type": "application/x-www-form-urlencoded",
+                "simkl-api-key": client_id,
+                "User-Agent": "PersonalMovieRecommender/0.1.0",
+            },
+            method="POST",
         )
+
         try:
-            with urllib.request.urlopen(check_req, timeout=15) as resp:
-                check_data = json.loads(resp.read().decode("utf-8"))
-                result = check_data.get("result")
-                if result == "OK":
-                    access_token = check_data.get("access_token")
+            with urllib.request.urlopen(token_req, timeout=15) as resp:
+                token_resp = json.loads(resp.read().decode("utf-8"))
+                access_token = token_resp.get("access_token")
+                if access_token:
                     print("\n\n🎉 Sukces! Otrzymano token autoryzacyjny użytkownika!")
 
-                    # Pobierzmy też od razu dane profilu (username/id)
-                    user_info_url = "https://api.simkl.com/users/settings"
-                    user_req = urllib.request.Request(
-                        user_info_url,
-                        headers={
-                            "simkl-api-key": client_id,
-                            "Authorization": f"Bearer {access_token}",
-                        },
-                    )
+                    # Pobierzmy dane zalogowanego użytkownika (settings / username)
                     username = None
                     try:
+                        user_info_url = "https://api.simkl.com/users/settings"
+                        user_req = urllib.request.Request(
+                            user_info_url,
+                            headers={
+                                "simkl-api-key": client_id,
+                                "Authorization": f"Bearer {access_token}",
+                                "User-Agent": "PersonalMovieRecommender/0.1.0",
+                            },
+                        )
                         with urllib.request.urlopen(user_req, timeout=10) as u_resp:
                             u_data = json.loads(u_resp.read().decode("utf-8"))
                             user_obj = u_data.get("user", {})
                             username = user_obj.get("name") or str(user_obj.get("id"))
-                            print(f"👤 Zalogowany jako użytkownik Simkl: {username}")
-                    except Exception:
-                        pass
+                            print(f"👤 Zalogowany użytkownik Simkl: {username}")
+                    except Exception as ue:
+                        print(f"[Ostrzeżenie] Nie udało się automatycznie pobrać nazwy użytkownika ({ue})")
 
-                    # Zaktualizujmy plik .env
+                    # Aktualizujemy .env
                     updates = {"SIMKL_USER_TOKEN": access_token}
                     if username:
                         updates["SIMKL_USERNAME"] = username
 
-                    # Jeśli w SIMKL_USER_TOKEN był omyłkowo wklejony client_secret, przenieśmy go do SIMKL_CLIENT_SECRET
+                    # Jeśli w SIMKL_USER_TOKEN był wklejony client_secret, przenieśmy go
                     old_token = env.get("SIMKL_USER_TOKEN")
                     if old_token and old_token != access_token and not env.get("SIMKL_CLIENT_SECRET"):
                         updates["SIMKL_CLIENT_SECRET"] = old_token
@@ -147,10 +175,18 @@ def main():
                     print(f"✅ Zaktualizowano {env_path} (ustawiono SIMKL_USER_TOKEN i SIMKL_USERNAME).")
                     return
         except urllib.error.HTTPError as e:
-            # 400/404 can mean authorization pending
-            pass
+            try:
+                err_data = json.loads(e.read().decode("utf-8"))
+                error_type = err_data.get("error")
+                if error_type in ("authorization_pending", "slow_down"):
+                    continue
+                else:
+                    print(f"\n❌ Błąd autoryzacji: {err_data}")
+                    sys.exit(1)
+            except Exception:
+                continue
         except Exception:
-            pass
+            continue
 
     print("\n⏰ Czas na autoryzację minął. Uruchom skrypt ponownie.")
 
