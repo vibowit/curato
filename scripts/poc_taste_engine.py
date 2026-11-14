@@ -284,68 +284,120 @@ class SimklApiClient:
 # ==========================================
 
 class GeminiProvider:
-    """Communicates with Gemini via Google GenAI REST endpoint."""
+    """Communicates with Gemini via Google GenAI REST endpoint with dynamic model discovery."""
 
-    API_ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/models"
+    BASE_URL = "https://generativelanguage.googleapis.com"
 
     def __init__(self, api_key: Optional[str] = None, model: Optional[str] = None):
         self.api_key = (api_key or os.environ.get("GEMINI_API_KEY", "")).strip().strip("'\"")
-        raw_model = (model or os.environ.get("GEMINI_MODEL", "gemini-1.5-flash")).strip().strip("'\"")
-        # Normalize model name if user specified 2.5 or flash-latest
-        if "2.5" in raw_model:
-            raw_model = "gemini-1.5-flash"
-        self.model = raw_model
+        self.model = (model or os.environ.get("GEMINI_MODEL", "")).strip().strip("'\"")
+
+    def discover_models(self) -> List[str]:
+        """Queries Google's ListModels endpoint to get all supported models for this API key."""
+        if not self.api_key:
+            return []
+
+        for api_version in ("v1beta", "v1"):
+            url = f"{self.BASE_URL}/{api_version}/models?key={self.api_key}"
+            try:
+                req = urllib.request.Request(url, headers={"User-Agent": "PersonalMovieRecommender/0.1.0"})
+                with urllib.request.urlopen(req, timeout=10) as resp:
+                    data = json.loads(resp.read().decode("utf-8"))
+                    models = []
+                    for m in data.get("models", []):
+                        methods = m.get("supportedGenerationMethods", [])
+                        if "generateContent" in methods:
+                            name = m.get("name", "").replace("models/", "")
+                            models.append((name, api_version))
+                    if models:
+                        # Prioritize Flash models, then newest versions
+                        sorted_models = sorted(
+                            models,
+                            key=lambda item: (
+                                0 if "flash" in item[0].lower() else 1,
+                                0 if "2" in item[0] else 1,
+                                item[0],
+                            ),
+                        )
+                        return sorted_models
+            except Exception:
+                continue
+        return []
 
     def generate_json(self, prompt: str) -> Dict[str, Any]:
-        """Calls Gemini with system instructions to return pure JSON."""
+        """Calls Gemini with system instructions to return pure JSON, auto-discovering models if needed."""
         if not self.api_key:
             raise ValueError("GEMINI_API_KEY is not set.")
 
-        models_to_try = [self.model]
-        if "gemini-1.5-flash" not in models_to_try:
-            models_to_try.append("gemini-1.5-flash")
+        # Candidate endpoints: pairs of (model_name, api_version)
+        candidates: List[Tuple[str, str]] = []
+        if self.model:
+            candidates.append((self.model, "v1beta"))
+            candidates.append((self.model, "v1"))
 
+        # Fallback well-known names
+        for fallback in (
+            "gemini-2.0-flash",
+            "gemini-2.0-flash-exp",
+            "gemini-flash-latest",
+            "gemini-1.5-flash-latest",
+            "gemini-1.5-flash-002",
+            "gemini-1.5-flash-001",
+            "gemini-1.5-flash",
+        ):
+            if fallback != self.model:
+                candidates.append((fallback, "v1beta"))
+
+        # Try user-specified/common models first
         last_error = None
-        for m in models_to_try:
-            url = f"{self.API_ENDPOINT}/{m}:generateContent?key={self.api_key}"
-            payload = {
-                "contents": [
-                    {
-                        "parts": [{"text": prompt}]
-                    }
-                ],
-                "generationConfig": {
-                    "temperature": 0.3,
-                    "responseMimeType": "application/json",
-                },
-            }
+        for m_name, m_ver in candidates:
+            success, res, err = self._call_generate(m_name, m_ver, prompt)
+            if success:
+                return res
+            last_error = err
 
-            req = urllib.request.Request(
-                url,
-                data=json.dumps(payload).encode("utf-8"),
-                headers={"Content-Type": "application/json"},
-                method="POST",
-            )
-
-            try:
-                with urllib.request.urlopen(req, timeout=30) as resp:
-                    data = json.loads(resp.read().decode("utf-8"))
-                    text = (
-                        data.get("candidates", [{}])[0]
-                        .get("content", {})
-                        .get("parts", [{}])[0]
-                        .get("text", "{}")
-                    )
-                    return json.loads(text)
-            except urllib.error.HTTPError as e:
-                err_body = e.read().decode("utf-8")
-                last_error = f"HTTP {e.code} ({m}): {err_body}"
-                continue
-            except urllib.error.URLError as e:
-                last_error = f"Network error ({m}): {e}"
-                continue
+        # If static candidates failed (e.g. 404), discover dynamically from ListModels
+        discovered = self.discover_models()
+        if discovered:
+            print(f"[Info] Discovered available models from Google: {[m[0] for m in discovered[:4]]}")
+            for m_name, m_ver in discovered:
+                success, res, err = self._call_generate(m_name, m_ver, prompt)
+                if success:
+                    return res
+                last_error = err
 
         raise RuntimeError(f"Gemini API error: {last_error}")
+
+    def _call_generate(self, model: str, version: str, prompt: str) -> Tuple[bool, Any, Optional[str]]:
+        url = f"{self.BASE_URL}/{version}/models/{model}:generateContent?key={self.api_key}"
+        payload = {
+            "contents": [{"parts": [{"text": prompt}]}],
+            "generationConfig": {
+                "temperature": 0.3,
+                "responseMimeType": "application/json",
+            },
+        }
+        req = urllib.request.Request(
+            url,
+            data=json.dumps(payload).encode("utf-8"),
+            headers={"Content-Type": "application/json", "User-Agent": "PersonalMovieRecommender/0.1.0"},
+            method="POST",
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=30) as resp:
+                data = json.loads(resp.read().decode("utf-8"))
+                text = (
+                    data.get("candidates", [{}])[0]
+                    .get("content", {})
+                    .get("parts", [{}])[0]
+                    .get("text", "{}")
+                )
+                return True, json.loads(text), None
+        except urllib.error.HTTPError as e:
+            err_body = e.read().decode("utf-8")
+            return False, None, f"HTTP {e.code} ({version}/{model}): {err_body}"
+        except Exception as e:
+            return False, None, f"Error ({version}/{model}): {e}"
 
 
 # ==========================================
