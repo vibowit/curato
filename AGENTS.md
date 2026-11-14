@@ -32,6 +32,10 @@ większą zmianą.
 -   Nie zakładaj poprawności niezweryfikowanych endpointów; sprawdź
     aktualną dokumentację i zapisz potwierdzone decyzje.
 -   Nie dodawaj zależności bez potrzeby.
+-   Współbieżność i SQLite: zadania w tle oraz równoległe korutyny muszą
+    otwierać własną, krótką sesję `SessionLocal()` w bloku kontekstowym;
+    nigdy nie współdziel sesji pomiędzy taskami asyncio ani nie trzymaj
+    otwartej transakcji podczas oczekiwania na zewnętrzne API.
 
 ## Praca z LLM
 
@@ -46,6 +50,8 @@ większą zmianą.
 
 -   Dodaj testy do każdej nowej logiki.
 -   Testuj integracje z mockami; testy live oznaczaj oddzielnie.
+-   Do mockowania zapytań HTTP w testach używaj wyłącznie wbudowanego
+    `httpx.MockTransport` (bez doinstalowywania respx/responses).
 -   Testuj deduplikację, brak rekomendacji obejrzanych i brak zapisu bez
     akceptacji.
 -   Testuj ponowienie operacji Simkl bez duplikatów.

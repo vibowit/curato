@@ -290,3 +290,9 @@ Brak. Wszystkie etapy MVP (PoC, 0, 1, 2, 3, 4, 5) są w pełni zaimplementowane 
   2. Zaplanowano **Etap 7 (Konteneryzacja i wdrożenie na Proxmox)**: wieloetapowy `Dockerfile` z użytkownikiem nieuprzywilejowanym, skrypt startowy `entrypoint.sh` wykonujący automatyczne migracje `alembic upgrade head`, konfiguracja `docker-compose.yml` z wolumenem danych bazy oraz procedura uruchomienia w kontenerze LXC Debian z Dockerem pod Proxmox VE.
   3. Zaplanowano **Etap 8 (Przygotowanie repozytorium do upublicznienia na GitHub i Docker Hub)**: audyt bezpieczeństwa sekretów, profesjonalna dokumentacja `README.md`, licencja MIT, szablony GitHub oraz workflow GitHub Actions CI/CD automatycznie testujący kod i publikujący wieloarchitektoniczne obrazy na Docker Hub.
 - **Uzasadnienie**: Ustalenie jasnego planu przejścia projektu z fazy lokalnego MVP do niezawodnej, stale działającej domowej mikro-usługi na Proxmoxie oraz publicznego projektu Open Source.
+
+### 2026-11-14 — Wdrożenie wytycznych dla agentów i skilla wdrożeniowego Proxmox/Docker
+- **Decyzja / Zmiana**:
+  1. Zaktualizowano `AGENTS.md` o precyzyjną regułę izolacji sesji bazy SQLite w zadaniach asynchronicznych i tle (zapobieganie wyciekom sesji i blokadom bazy przy współbieżności) oraz wymóg stosowania wyłącznie wbudowanego `httpx.MockTransport` w testach jednostkowych.
+  2. Utworzono dedykowany skill workspace `.agents/skills/docker-proxmox-sqlite/SKILL.md` definiujący procedurę uprawnień wolumenów SQLite WAL (UID 1000 `appuser`), automatycznych migracji Alembic w `entrypoint.sh` oraz bezbuforowej konfiguracji Reverse Proxy (Caddy/Nginx) dla streamingu SSE serwera MCP (ChatGPT).
+- **Uzasadnienie**: Zapewnienie powtarzalnych wzorców pracy dla agentów AI przed rozpoczęciem prac nad Etapami 6 i 7.
