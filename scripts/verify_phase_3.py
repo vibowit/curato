@@ -37,8 +37,8 @@ async def main():
         print("\n[1/3] Sprawdzanie historii Simkl w lokalnej bazie SQLite...")
         if history_count == 0:
             print("      Brak historii w bazie. Uruchamiam synchronizację z API Simkl...")
-            sync_service = SyncService()
-            sync_result = await sync_service.sync_simkl(db)
+            sync_service = SyncService(db_session=db)
+            sync_result = await sync_service.sync_simkl()
             print(
                 f"      ✅ Zsynchronizowano: {sync_result.items_synced} pozycji "
                 f"(status: {sync_result.status})"
@@ -52,7 +52,7 @@ async def main():
         if not active_profile:
             print("      Brak aktywnego profilu. Generuję profil gustu przez LLM (Gemini)...")
             taste_service = TasteService()
-            profile_model = await taste_service.generate_taste_profile(db)
+            profile_model = await taste_service.generate_profile(db)
             print(f"      ✅ Wygenerowano aktywny profil: wersja {profile_model.version}")
         else:
             print(f"      ✅ Aktywny profil gustu: wersja {active_profile.version}")
