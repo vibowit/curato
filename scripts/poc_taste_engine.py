@@ -26,6 +26,24 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Set, Tuple
 
 
+def load_dotenv(env_path: Optional[Path] = None) -> None:
+    """Loads key-value pairs from .env into os.environ if not already set."""
+    path = env_path or Path(__file__).resolve().parent.parent / ".env"
+    if path.exists():
+        with open(path, "r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if line and not line.startswith("#") and "=" in line:
+                    k, v = line.split("=", 1)
+                    k = k.strip()
+                    v = v.strip().strip("'\"")
+                    if k not in os.environ:
+                        os.environ[k] = v
+
+
+load_dotenv()
+
+
 # ==========================================
 # Domain Data Classes & Schemas
 # ==========================================
@@ -205,6 +223,7 @@ class SimklApiClient:
         headers = {
             "Content-Type": "application/json",
             "simkl-api-key": self.client_id,
+            "User-Agent": "PersonalMovieRecommender/0.1.0",
         }
         if self.user_token:
             headers["Authorization"] = f"Bearer {self.user_token}"
@@ -599,10 +618,15 @@ Return a JSON object with:
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Simkl Taste Engine - Proof of Concept (PoC)")
     parser.add_argument(
+        "--live",
+        action="store_true",
+        help="Fetch real user history directly from Simkl API instead of local fixture",
+    )
+    parser.add_argument(
         "--fixture",
         type=Path,
-        default=Path("data/sample_simkl_history.json"),
-        help="Path to sample Simkl JSON fixture file",
+        default=None,
+        help="Path to sample Simkl JSON fixture file (default: data/sample_simkl_history.json)",
     )
     parser.add_argument(
         "--offline",
@@ -623,16 +647,19 @@ def main() -> None:
     output_dir: Path = args.output_dir
     output_dir.mkdir(parents=True, exist_ok=True)
 
+    use_live_simkl = args.live or (not args.fixture and not args.offline and bool(os.environ.get("SIMKL_USER_TOKEN")))
+    fixture_path = None if use_live_simkl else (args.fixture or Path("data/sample_simkl_history.json"))
+
     print("==================================================")
     print("🎬 Simkl Taste Engine - Proof of Concept (PoC)")
     print("==================================================")
-    print(f"Fixture path : {args.fixture}")
-    print(f"Mode         : {'Offline / Mock' if args.offline or not os.environ.get('GEMINI_API_KEY') else 'Live Gemini'}")
+    print(f"Data source  : {'Live Simkl API (account: ' + str(os.environ.get('SIMKL_USERNAME', 'authenticated user')) + ')' if use_live_simkl else f'Fixture: {fixture_path}'}")
+    print(f"Mode         : {'Offline / Heuristic' if args.offline or not os.environ.get('GEMINI_API_KEY') else 'Live Gemini'}")
     print(f"Output dir   : {output_dir}")
     print("--------------------------------------------------")
 
     engine = TasteEnginePoC(
-        fixture_path=args.fixture,
+        fixture_path=fixture_path,
         offline_mode=args.offline or not os.environ.get("GEMINI_API_KEY"),
     )
     result = engine.run()
