@@ -31,6 +31,7 @@ class Settings(BaseSettings):
 
     # LLM Providers
     GEMINI_API_KEY: SecretStr | None = None
+    GEMINI_MODEL: str | None = None
     OPENAI_API_KEY: SecretStr | None = None
 
     # TMDB Integration
