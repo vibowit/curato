@@ -38,6 +38,13 @@ class Settings(BaseSettings):
     TMDB_API_KEY: SecretStr | None = None
     TMDB_READ_ACCESS_TOKEN: SecretStr | None = None
 
+    # MCP & Scheduler
+    MCP_SERVER_NAME: str = "movie-recommend"
+    MCP_API_KEY: SecretStr | None = None
+    SCHEDULER_ENABLED: bool = False
+    SCHEDULER_INTERVAL_HOURS: int = 168
+    SCHEDULER_RUN_ON_STARTUP: bool = False
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",

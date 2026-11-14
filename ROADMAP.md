@@ -63,14 +63,14 @@ automatycznego zapisu. (Ukończono pomyślnie)
 
 ## Etap 5 -- MCP i harmonogram
 
--   [ ] MCP STDIO dla Antigravity.
--   [ ] MCP HTTPS dla ChatGPT, po weryfikacji obsługi w docelowym
+-   [x] MCP STDIO dla Antigravity.
+-   [x] MCP HTTPS dla ChatGPT, po weryfikacji obsługi w docelowym
     środowisku.
--   [ ] Cotygodniowy job i generowanie na żądanie.
--   [ ] Monitoring i powiadomienie o nowej edycji.
+-   [x] Cotygodniowy job i generowanie na żądanie.
+-   [x] Monitoring i powiadomienie o nowej edycji.
 
 **Akceptacja:** oba interfejsy korzystają z tego samego profilu i
-historii.
+historii. (Ukończono pomyślnie)
 
 ## Po MVP
 

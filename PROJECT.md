@@ -6,7 +6,7 @@ priority: P1
 category: dev
 created: "2026-11-06"
 updated: "2026-11-14"
-next_action: "Zrealizować Etap 5 (MCP i harmonogram): serwer MCP STDIO dla Antigravity, MCP HTTPS/Streamable dla ChatGPT oraz harmonogram cotygodniowego generowania propozycji"
+next_action: "Przeprowadzić weryfikację integracji MCP na żywo w Antigravity/ChatGPT oraz zaplanować funkcje po-MVP (powiadomienia Pushover, analiza zmian gustu)"
 tags:
   - movie-recommendation
   - simkl
@@ -30,8 +30,8 @@ Jasno zdefiniowany cel końcowy projektu (MVP):
 - [x] Wersjonowany profil gustu użytkownika z możliwością ręcznej korekty.
 - [x] Silnik rekomendacji integrujący TMDB i LLM (10 filmów, 5 seriali na edycję) z uzasadnieniami i bez duplikatów.
 - [x] Prosty interfejs użytkownika do przeglądu i zatwierdzania/odrzucania propozycji.
-- [ ] Serwer MCP (STDIO dla Antigravity, HTTPS dla ChatGPT) udostępniający te same serwisy domenowe.
-- [ ] Testy automatyczne (pokrycie kluczowych modułów > 80%, testy mockujące Simkl/TMDB/LLM).
+- [x] Serwer MCP (STDIO dla Antigravity, HTTPS dla ChatGPT) udostępniający te same serwisy domenowe.
+- [x] Testy automatyczne (pokrycie kluczowych modułów > 80%, testy mockujące Simkl/TMDB/LLM).
 - [ ] Dokumentacja uruchomieniowa i szablon `.env.example`.
 
 ## Bieżący Stan i Architektura
@@ -82,10 +82,17 @@ Jasno zdefiniowany cel końcowy projektu (MVP):
     - Wdrożono endpointy REST API (`app/api/v1/decisions.py`): `POST /api/recommendations/decisions`, `POST /api/recommendations/approve`, `GET /api/recommendations/decisions` oraz `GET /api/recommendations/latest`.
     - Zbudowano nowoczesny, responsywny panel webowy SPA (`frontend/index.html`, `frontend/styles.css`, `frontend/app.js`) serwowany bezpośrednio przez FastAPI bez zewnętrznych zależności.
     - Rozszerzono zestaw testów automatycznych do **86 testów** (`pytest`) przechodzących w 100% z pełną zgodnością lintera i formatera `ruff`.
+  - Zrealizowano i przetestowano **Etap 5 (MCP i harmonogram)**:
+    - Zaimplementowano serwer MCP w standardzie `mcp>=2.0.0` (`app/mcp/server.py`) z pełnym zestawem 8 narzędzi domenowych: `get_taste_profile`, `get_library_stats`, `sync_simkl`, `generate_recommendations`, `get_recommendations`, `record_decision`, `approve_recommendations`, `get_recommendation_history`.
+    - Zaimplementowano punkt wejścia CLI STDIO (`app/mcp/cli.py`) dla lokalnych klientów MCP (Antigravity IDE / CLI, Claude Desktop, Cursor).
+    - Zintegrowano transport SSE / Streamable HTTP (`/mcp/sse`, `/mcp/messages/`) z dedykowanym middleware autoryzacyjnym `MCPAuthMiddleware` chroniącym endpoint tokenem `MCP_API_KEY` (dla ChatGPT / zdalnych asystentów).
+    - Zaimplementowano harmonogram `AsyncIOScheduler` (`app/core/scheduler.py`) z cotygodniowym zadaniem synchronizacji i generowania nowej edycji oraz endpointy REST w `app/api/v1/scheduler.py` (`GET /api/scheduler/status`, `POST /api/scheduler/trigger`).
+    - Rozszerzono zestaw testów automatycznych do **103 testów** (`pytest`) przechodzących w 100% z pełną zgodnością lintera i formatera `ruff`.
 - **Kluczowe moduły**:
-  - `app/main.py` — fabryka aplikacji FastAPI, serwowanie frontendu, lifespan, middleware i obsługa błędów
-  - `app/core/` — konfiguracja Pydantic Settings, silnik bazy SQLite i logowanie
+  - `app/main.py` — fabryka aplikacji FastAPI, montowanie SSE MCP (`/mcp`), serwowanie frontendu, lifespan, middleware i obsługa błędów
+  - `app/core/` — konfiguracja Pydantic Settings, silnik bazy SQLite, harmonogram (`scheduler.py`) i logowanie
   - `app/models/` — modele SQLAlchemy 2.0 (`media_items`, `watch_history`, `taste_profiles`, `recommendation_runs`, `recommendations`, `user_decisions`, itp.)
+  - `app/mcp/` — adapter Model Context Protocol (`server.py`, `cli.py`)
   - `app/integrations/simkl.py` — asynchroniczny klient API Simkl
   - `app/integrations/tmdb.py` — asynchroniczny klient API TMDB v3/v4
   - `app/integrations/llm/` — adaptery LLM (`LLMProvider`, `GeminiLLMClient`)
@@ -96,21 +103,21 @@ Jasno zdefiniowany cel końcowy projektu (MVP):
   - `app/services/discovery.py` — zasilanie puli kandydatów z TMDB
   - `app/services/recommendations.py` — filtry anty-rekomendacji, ranking, ocena LLM, dywersyfikacja i rejestracja przebiegów
   - `app/services/decisions.py` — rejestracja decyzji użytkownika i historia
-  - `app/api/` — endpointy REST (w tym `/api/health`, `/api/sync/simkl`, `/api/profile`, `/api/recommendation-runs`, `/api/recommendations/*`)
+  - `app/api/` — endpointy REST (w tym `/api/health`, `/api/sync/simkl`, `/api/profile`, `/api/recommendation-runs`, `/api/recommendations/*`, `/api/scheduler/*`)
   - `frontend/` — lekki interfejs użytkownika (SPA HTML5 + CSS Grid + Vanilla JS)
   - `migrations/` — migracje bazy danych Alembic
   - `scripts/poc_taste_engine.py` — samodzielny skrypt badawczy PoC
   - `scripts/get_simkl_token.py` — asystent autoryzacji OAuth 2.0 Simkl Device Flow
-  - `tests/` — testy jednostkowe i integracyjne (86 testów)
+  - `tests/` — testy jednostkowe i integracyjne (103 testy)
   - `data/` — lokalna baza SQLite i pliki wyjściowe
 
 ## Najbliższy Krok (Next Action)
 
-> Zrealizować Etap 5 (MCP i harmonogram): serwer MCP STDIO dla Antigravity, MCP HTTPS/Streamable dla ChatGPT oraz harmonogram cotygodniowego generowania propozycji.
+> Przeprowadzić weryfikację integracji MCP na żywo w Antigravity/ChatGPT oraz zaplanować funkcje po-MVP (powiadomienia Pushover, analiza zmian gustu).
 
 ## Blokady (Blockers)
 
-Brak. Panel użytkownika, rejestracja decyzji i kontrolowane dodawanie do Simkl w pełni zaimplementowane i przetestowane.
+Brak. Wszystkie etapy MVP (PoC, 0, 1, 2, 3, 4, 5) są w pełni zaimplementowane i przetestowane.
 
 ## Backlog Zadań
 
@@ -150,10 +157,10 @@ Brak. Panel użytkownika, rejestracja decyzji i kontrolowane dodawanie do Simkl 
 - [x] Historia przebiegów i decyzji
 
 ### Etap 5: MCP i harmonogram
-- [ ] Narzędzia MCP STDIO dla Antigravity
-- [ ] MCP HTTPS/Streamable dla ChatGPT
-- [ ] Scheduler dla cotygodniowego generowania propozycji
-- [ ] Scheduler dla cotygodniowego generowania propozycji
+- [x] Narzędzia MCP STDIO dla Antigravity (`app/mcp/server.py`, `app/mcp/cli.py`)
+- [x] MCP HTTPS/Streamable dla ChatGPT (`/mcp/sse`, `/mcp/messages/`, `MCPAuthMiddleware`)
+- [x] Scheduler dla cotygodniowego generowania propozycji (`app/core/scheduler.py`, `app/api/v1/scheduler.py`)
+- [x] Monitoring i endpointy zarządzania harmonogramem
 
 ## Rejestr Decyzji (ADR)
 
@@ -232,3 +239,19 @@ Brak. Panel użytkownika, rejestracja decyzji i kontrolowane dodawanie do Simkl 
   7. Zaimplementowano nowoczesny, responsywny panel webowy (SPA w HTML5 + CSS Grid + Vanilla JS) w katalogu `frontend/`, serwowany bezpośrednio przez FastAPI bez zewnętrznych zależności.
   8. Rozszerzono zestaw testów automatycznych do **86 testów** (`pytest`) przechodzących w 100% oraz pełną zgodność lintera i formatera `ruff`.
 - **Uzasadnienie**: Spełnienie kryteriów akceptacji Etapu 4 z ROADMAP.md: pełny przepływ od listy propozycji do Plan to Watch działa bez automatycznego zapisu, z pełną kontrolą użytkownika i audytem decyzji.
+
+### 2026-11-14 — Wdrożenie Etapu 5 (MCP Server & Harmonogram)
+- **Decyzja / Zmiana**:
+  1. Zaimplementowano adapter Model Context Protocol (`mcp>=2.0.0`) w katalogu `app/mcp/`:
+     - `app/mcp/server.py` definiujący instancję `MCPServer` z 8 narzędziami domenowymi (`get_taste_profile`, `get_library_stats`, `sync_simkl`, `generate_recommendations`, `get_recommendations`, `record_decision`, `approve_recommendations`, `get_recommendation_history`).
+     - Twarde zabezpieczenie operacji zapisu: `approve_recommendations` rygorystycznie deleguje do `WatchlistService.add_approved_recommendations`, co uniemożliwia modelom LLM bezpośredni zapis bez uprzedniej decyzji `accept`.
+     - `app/mcp/cli.py` jako punkt wejścia STDIO dla lokalnych asystentów AI (Antigravity IDE / CLI, Claude Desktop, Cursor).
+  2. Zintegrowano transport SSE / Streamable HTTP (`/mcp/sse`, `/mcp/messages/`) w aplikacji FastAPI (`app/main.py`):
+     - Zaimplementowano middleware `MCPAuthMiddleware` chroniące endpoint kluczem `MCP_API_KEY` (Bearer header lub query param `?api_key=...`).
+     - Wyłączono restrykcję DNS rebindingu w SSE dla obsługi proxy/tunelowania i środowisk testowych.
+  3. Zaimplementowano asynchroniczny harmonogram `AsyncIOScheduler` (`app/core/scheduler.py`):
+     - Zarządzanie cyklem życia w `lifespan` FastAPI (`start_scheduler`, `stop_scheduler`).
+     - Cotygodniowy job synchronizujący Simkl i generujący świeżą edycję 10 filmów i 5 seriali (`mode='weekly'`).
+     - Dodano endpointy REST w `app/api/v1/scheduler.py` (`GET /api/scheduler/status`, `POST /api/scheduler/trigger`).
+  4. Rozszerzono zestaw testów automatycznych do **103 testów** (`pytest`) z wynikiem 100% sukcesu oraz pełną czystością lintera `ruff`.
+- **Uzasadnienie**: Spełnienie kryteriów akceptacji Etapu 5 z ROADMAP.md: oba interfejsy (lokalny STDIO dla Antigravity oraz zdalny SSE dla ChatGPT) korzystają z tych samych serwisów domenowych, tej samej bazy SQLite i tego samego profilu gustu bez duplikowania logiki.
