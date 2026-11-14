@@ -28,7 +28,10 @@ class GeminiLLMClient:
         "gemini-1.5-pro-latest",
         "gemini-1.5-pro",
         "gemini-pro",
+        "gemini-3-flash-preview",
     ]
+
+    _cached_working_model: Optional[str] = None
 
     def __init__(
         self,
@@ -41,7 +44,13 @@ class GeminiLLMClient:
             settings.GEMINI_API_KEY.get_secret_value() if settings.GEMINI_API_KEY else None
         )
         self._api_key = raw_key
-        self._model = model or settings.GEMINI_MODEL or self.DEFAULT_MODELS[0]
+        # Check explicit model, then cached working model, then config, then default
+        self._model = (
+            model
+            or self._cached_working_model
+            or settings.GEMINI_MODEL
+            or self.DEFAULT_MODELS[0]
+        )
         self.timeout = timeout
         self._external_client = client
 
@@ -154,6 +163,7 @@ class GeminiLLMClient:
 
                 if response.status_code == 200:
                     self._model = model_candidate
+                    GeminiLLMClient._cached_working_model = model_candidate
                     return self._parse_response(response.json())
 
                 if response.status_code in (401, 403):

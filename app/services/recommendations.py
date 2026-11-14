@@ -260,23 +260,25 @@ class SemanticScorer:
             "anti_preferences": profile.anti_preferences,
         }
 
+        n = len(candidates)
         return f"""
 Analyze the following media candidates and evaluate how well each fits the user's taste profile.
-You MUST return a JSON object with an "evaluations" array.
+You MUST return a JSON object with an "evaluations" array containing exactly {n} items.
+Every candidate from index 0 to {n-1} must have an evaluation.
 
 User Taste Profile:
 {json.dumps(profile_summary, ensure_ascii=False, indent=2)}
 
-Candidates to evaluate:
+Candidates to evaluate ({n} items):
 {json.dumps(candidates_json, ensure_ascii=False, indent=2)}
 
 Guidelines:
-1. "candidate_index": Exact integer index of candidate from the list.
+1. "candidate_index": Exact integer index of candidate from the list (0 to {n-1}).
 2. "match_score": Float 0 to 100 representing semantic fit with user profile.
 3. "confidence": Float 0.0 to 1.0 reflecting confidence from metadata quality.
 4. "positive_factors": 1 to 3 concise strings describing why this matches user taste.
 5. "risks": 0 to 2 potential concerns or mismatch risks (or empty list if none).
-6. "reason": A 1-2 sentence compelling Polish narrative explaining why this title fits.
+6. "reason": 1-2 sentence compelling Polish narrative explaining why this title fits.
 """
 
     async def evaluate_candidates(
@@ -449,16 +451,19 @@ class RecommendationService:
                 show_limit=15,
             )
 
-            # 6. LLM Semantic evaluation
-            all_top_candidates = top_movies + top_shows
-            evaluations_map = await self.semantic_scorer.evaluate_candidates(
-                candidates=all_top_candidates,
+            # 6. LLM Semantic evaluation (evaluated separately to guarantee full coverage)
+            movie_evals_map = await self.semantic_scorer.evaluate_candidates(
+                candidates=top_movies,
+                profile=profile_content,
+            )
+            show_evals_map = await self.semantic_scorer.evaluate_candidates(
+                candidates=top_shows,
                 profile=profile_content,
             )
 
             evaluated_movies: List[Tuple[CandidateItem, LLMRecommendationEvaluation]] = []
             for idx, cand in enumerate(top_movies):
-                ev = evaluations_map.get(idx)
+                ev = movie_evals_map.get(idx)
                 if not ev:
                     g_sub = ", ".join(cand.genres[:2])
                     ev = LLMRecommendationEvaluation(
@@ -476,12 +481,11 @@ class RecommendationService:
 
             evaluated_shows: List[Tuple[CandidateItem, LLMRecommendationEvaluation]] = []
             for idx, cand in enumerate(top_shows):
-                show_idx = len(top_movies) + idx
-                ev = evaluations_map.get(show_idx)
+                ev = show_evals_map.get(idx)
                 if not ev:
                     g_sub = ", ".join(cand.genres[:2])
                     ev = LLMRecommendationEvaluation(
-                        candidate_index=show_idx,
+                        candidate_index=idx,
                         match_score=min(95.0, max(60.0, cand.vote_average * 10.0)),
                         confidence=0.7,
                         positive_factors=[f"Dopasowanie gatunkowe: {g_sub}"],
