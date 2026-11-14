@@ -9,23 +9,22 @@ Validates:
 """
 
 import json
-import os
-import unittest
-from pathlib import Path
 
 # Add project root to path
 import sys
+import unittest
+from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from scripts.poc_taste_engine import (
+from scripts.poc_taste_engine import (  # noqa: E402
     AntiRecommendationFilter,
+    RecommendationItem,
+    RecommendationSet,
     SimklDataExtractor,
     TasteEnginePoC,
     TasteProfile,
-    RecommendationSet,
-    RecommendationItem,
 )
 
 
@@ -142,7 +141,11 @@ class TestPocTasteEngine(unittest.TestCase):
             ],
             themes=[
                 {"motif": "Existential dread / Identity", "weight": 0.9, "confidence": 0.85},
-                {"motif": "Time anomalies & non-linear storytelling", "weight": 0.95, "confidence": 0.9},
+                {
+                    "motif": "Time anomalies & non-linear storytelling",
+                    "weight": 0.95,
+                    "confidence": 0.9,
+                },
             ],
             directors_or_creators=["Denis Villeneuve", "Christopher Nolan", "David Fincher"],
             anti_preferences=[
@@ -158,7 +161,7 @@ class TestPocTasteEngine(unittest.TestCase):
         self.assertIn("Formulaic superhero blockbusters", profile_dict["anti_preferences"])
 
     def test_recommendation_set_validation(self):
-        """Test that recommendation sets validate exact quantities (10 movies, 5 shows) and schemas."""
+        """Test that recommendation sets validate exact quantities and schemas."""
         movies = [
             RecommendationItem(
                 title=f"Movie {i}",

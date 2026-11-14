@@ -1,0 +1,51 @@
+from pathlib import Path
+
+from pydantic import SecretStr
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+class Settings(BaseSettings):
+    """Central application settings validated with Pydantic Settings."""
+
+    PROJECT_NAME: str = "Movie & Show Recommendation System"
+    VERSION: str = "0.1.0"
+    ENVIRONMENT: str = "development"
+    LOG_LEVEL: str = "INFO"
+
+    # Database
+    DATABASE_URL: str = "sqlite:///data/movie_recommend.db"
+
+    # Simkl Integration
+    SIMKL_CLIENT_ID: SecretStr | None = None
+    SIMKL_CLIENT_SECRET: SecretStr | None = None
+    SIMKL_ACCESS_TOKEN: SecretStr | None = None
+
+    # LLM Providers
+    GEMINI_API_KEY: SecretStr | None = None
+    OPENAI_API_KEY: SecretStr | None = None
+
+    # TMDB Integration
+    TMDB_API_KEY: SecretStr | None = None
+    TMDB_READ_ACCESS_TOKEN: SecretStr | None = None
+
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        extra="ignore",
+    )
+
+    @property
+    def is_sqlite(self) -> bool:
+        return self.DATABASE_URL.startswith("sqlite")
+
+    def ensure_data_dir(self) -> None:
+        """Ensure the local directory for sqlite or data storage exists."""
+        if self.is_sqlite:
+            # Strip sqlite:/// or sqlite:////
+            clean_path = self.DATABASE_URL.replace("sqlite:///", "")
+            if clean_path and clean_path != ":memory:":
+                db_file = Path(clean_path)
+                db_file.parent.mkdir(parents=True, exist_ok=True)
+
+
+settings = Settings()

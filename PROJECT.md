@@ -6,7 +6,7 @@ priority: P1
 category: dev
 created: "2026-11-06"
 updated: "2026-11-14"
-next_action: "Zrealizować Etap 0 (Fundament): struktura katalogów w app/, konfiguracja FastAPI, modele bazy SQLite wg DATA_MODEL.md oraz Pydantic Settings"
+next_action: "Zrealizować Etap 1 (Simkl): klient API Simkl, pobieranie historii, ocen i listy Plan to Watch, przyrostowa synchronizacja do SQLite oraz idempotentny zapis zaakceptowanych pozycji"
 tags:
   - movie-recommendation
   - simkl
@@ -25,7 +25,7 @@ Prywatny system rekomendacji filmów i seriali oparty na Simkl, profilu gustu u�
 
 Jasno zdefiniowany cel końcowy projektu (MVP):
 - [x] Działający skrypt PoC (Simkl Taste Engine) walidujący jakość profilowania i rekomendacji LLM.
-- [ ] Stabilny szkielet aplikacji w `FastAPI` z bazą `SQLite` i migracjami.
+- [x] Stabilny szkielet aplikacji w `FastAPI` z bazą `SQLite` i migracjami.
 - [ ] Integracja z Simkl: autoryzacja, synchronizacja biblioteki/ocen/Plan to Watch, idempotentny zapis wyłącznie zaakceptowanych pozycji.
 - [ ] Wersjonowany profil gustu użytkownika z możliwością ręcznej korekty.
 - [ ] Silnik rekomendacji integrujący TMDB i LLM (10 filmów, 5 seriali na edycję) z uzasadnieniami i bez duplikatów.
@@ -49,25 +49,31 @@ Jasno zdefiniowany cel końcowy projektu (MVP):
   - Zaimplementowano i przetestowano skrypt badawczy `scripts/poc_taste_engine.py` (ekstrakcja historii Simkl, filtr anty-rekomendacji, integracja z Simkl API przez OAuth 2.0 Device Flow oraz profilowanie przez model Gemini 2.5 Flash).
   - Skrypt pomyślnie wygenerował pliki `data/output/taste_profile_poc.json` i `data/output/recommendations_poc.json`.
   - Użytkownik przeprowadził ewaluację jakościową: profil gustu został oceniony jako **bardzo trafny**. Zgłoszono uwagę dotyczącą preferencji ograniczenia animacji i zbalansowania sci-fi w docelowej integracji z TMDB (Etap 3).
-  - Wszystkie testy jednostkowe przechodzą (6/6 OK). Potwierdzono gwarancję zera operacji zapisu do Simkl.
+  - Zrealizowano i przetestowano **Etap 0 (Fundament)**:
+    - Utworzono strukturę modułów w `app/` (`core`, `models`, `schemas`, `api`, `services`, `integrations`).
+    - Skonfigurowano walidację ustawień z `pydantic-settings` i bezpieczne maskowanie sekretów (`SecretStr`).
+    - Zaimplementowano deklaratywne modele bazy danych SQLite w `SQLAlchemy 2.0` wg `DATA_MODEL.md` (`media_items`, `watch_history`, `taste_profiles`, `recommendation_runs`, `recommendations`, `user_decisions`, `sync_state`, `app_settings`).
+    - Skonfigurowano migracje bazy danych w `Alembic` oraz wygenerowano i zweryfikowano pierwszą migrację `b00467105c7b_initial_schema.py`.
+    - Zaimplementowano fabrykę aplikacji `FastAPI`, middleware korelacji `X-Request-ID`, ustandaryzowaną obsługę błędów wg `API_CONTRACTS.md` oraz endpoint `GET /api/health`.
+    - Przygotowano zestaw testów automatycznych w `pytest` (16 testów przechodzi w 100%) oraz czystą weryfikację `ruff`.
 - **Kluczowe moduły**:
+  - `app/main.py` — fabryka aplikacji FastAPI, lifespan, middleware i obsługa błędów
+  - `app/core/` — konfiguracja Pydantic Settings, silnik bazy SQLite i logowanie
+  - `app/models/` — modele SQLAlchemy 2.0 (`media_items`, `watch_history`, `recommendations`, itp.)
+  - `app/api/` — endpointy REST (w tym `GET /api/health`)
+  - `migrations/` — migracje bazy danych Alembic
   - `scripts/poc_taste_engine.py` — samodzielny skrypt badawczy PoC
   - `scripts/get_simkl_token.py` — asystent autoryzacji OAuth 2.0 Simkl Device Flow
-  - `app/api/` — endpointy REST (FastAPI)
-  - `app/integrations/` — adaptery do Simkl, TMDB, LLM
-  - `app/services/` — logika domenowa (sync, profil gustu, ranking, rekomendacje)
-  - `app/mcp/` — cienka warstwa adaptera MCP
-  - `app/models/` — modele bazy i schematy domenowe
-  - `tests/` — testy jednostkowe i integracyjne
-  - `data/` — lokalna baza SQLite i eksporty badawcze
+  - `tests/` — testy jednostkowe i integracyjne (konfiguracja, baza, migracje, healthcheck)
+  - `data/` — lokalna baza SQLite i pliki wyjściowe
 
 ## Najbliższy Krok (Next Action)
 
-> Zrealizować Etap 0 (Fundament): struktura katalogów w app/, konfiguracja FastAPI, modele bazy SQLite wg DATA_MODEL.md oraz Pydantic Settings.
+> Zrealizować Etap 1 (Simkl): klient API Simkl, pobieranie historii, ocen i listy Plan to Watch, przyrostowa synchronizacja do SQLite oraz idempotentny zapis zaakceptowanych pozycji.
 
 ## Blokady (Blockers)
 
-Brak. Etap PoC pomyślnie zakończony, środowisko i autoryzacje Simkl/Gemini działają.
+Brak. Fundament aplikacji gotowy i w pełni przetestowany.
 
 ## Backlog Zadań
 
@@ -78,10 +84,10 @@ Brak. Etap PoC pomyślnie zakończony, środowisko i autoryzacje Simkl/Gemini dz
 - [x] Ewaluacja jakości wygenerowanych rekomendacji przez użytkownika
 
 ### Etap 0: Fundament
-- [ ] Inicjalizacja repozytorium i struktury `app/`
-- [ ] FastAPI, SQLite i migracje schematu bazy wg `DATA_MODEL.md`
-- [ ] Logowanie, obsługa błędów, konfiguracja sekretów z walidacją Pydantic Settings
-- [ ] Konfiguracja testów `pytest` i reguł `ruff`
+- [x] Inicjalizacja repozytorium i struktury `app/`
+- [x] FastAPI, SQLite i migracje schematu bazy wg `DATA_MODEL.md`
+- [x] Logowanie, obsługa błędów, konfiguracja sekretów z walidacją Pydantic Settings
+- [x] Konfiguracja testów `pytest` i reguł `ruff`
 
 ### Etap 1: Simkl
 - [ ] Klient API Simkl i obsługa uwierzytelniania
@@ -132,3 +138,12 @@ Brak. Etap PoC pomyślnie zakończony, środowisko i autoryzacje Simkl/Gemini dz
   4. Potwierdzono trafność opisu profilu gustu użytkownika (orientacja na Crime, Drama, Thriller, Historical Realism, moralną niejednoznaczność i wyrazistych reżyserów).
   5. **Wniosek do Etapu 3 (Rekomendacje)**: Pula kandydatów w PoC zawierała sztywną listę tytułów (stąd obecność animacji *Scavengers Reign* oraz nadmiaru sci-fi). W docelowym silniku kandydaci będą pobierani dynamicznie z TMDB z uwzględnieniem preferencji dotyczących wykluczania animacji oraz zachowania właściwych proporcji gatunkowych.
 - **Uzasadnienie**: Spełnienie kryteriów akceptacji Etapu PoC z ROADMAP.md i formalne przejście do prac nad Etapem 0 (Fundament).
+
+### 2026-11-14 — Wdrożenie Etapu 0 (Fundament)
+- **Decyzja / Zmiana**:
+  1. Zaimplementowano szkielet backendu w `FastAPI` ze strukturą modułową w katalogu `app/`.
+  2. Wprowadzono `pydantic-settings` do walidacji konfiguracji oraz `SecretStr` do ochrony wrażliwych tokenów przed wyciekiem w logach.
+  3. Wybrano `SQLAlchemy 2.0` (z typowaniem `Mapped`) oraz `Alembic` do zarządzania bazą `SQLite` (`DATA_MODEL.md`), z wymuszeniem `PRAGMA foreign_keys=ON` i renderowaniem migracji w trybie batchowym.
+  4. Zaimplementowano globalne mapowanie błędów na kody z `API_CONTRACTS.md` oraz middleware korelacji `X-Request-ID`.
+  5. Pokryto fundament 16 testami automatycznymi (`pytest`) oraz skonfigurowano sprawdzanie reguł jakości kodu `ruff`.
+- **Uzasadnienie**: Zapewnienie stabilnej, skalowalnej i przetestowanej bazy architektonicznej dla integracji z Simkl (Etap 1).

@@ -13,13 +13,13 @@
 
 ## Etap 0 -- fundament
 
--   [ ] Repozytorium, konfiguracja i struktura modułów.
--   [ ] FastAPI, SQLite, migracje.
--   [ ] Logowanie, obsługa błędów, konfiguracja sekretów.
--   [ ] Testy i CI.
+-   [x] Repozytorium, konfiguracja i struktura modułów.
+-   [x] FastAPI, SQLite, migracje.
+-   [x] Logowanie, obsługa błędów, konfiguracja sekretów.
+-   [x] Testy i CI.
 
 **Akceptacja:** aplikacja uruchamia się lokalnie, migracje i testy
-przechodzą.
+przechodzą. (Ukończono pomyślnie)
 
 ## Etap 1 -- Simkl
 
