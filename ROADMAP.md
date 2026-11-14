@@ -33,12 +33,12 @@ do Simkl jest kontrolowany i idempotentny. (Ukończono pomyślnie)
 
 ## Etap 2 -- profil gustu
 
--   [ ] Analiza historii i ocen.
--   [ ] Pierwszy profil JSON z wagami i confidence.
--   [ ] Wersjonowanie i ręczna korekta profilu.
+-   [x] Analiza historii i ocen.
+-   [x] Pierwszy profil JSON z wagami i confidence.
+-   [x] Wersjonowanie i ręczna korekta profilu.
 
 **Akceptacja:** profil ma uzasadnienie i można odtworzyć, z jakich
-danych powstał.
+danych powstał. (Ukończono pomyślnie)
 
 ## Etap 3 -- rekomendacje
 

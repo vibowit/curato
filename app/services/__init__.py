@@ -1,1 +1,5 @@
-"""Domain services package (sync, taste profiling, recommendation engine)."""
+from app.services.sync import SyncService
+from app.services.taste import TasteService
+from app.services.watchlist import WatchlistService
+
+__all__ = ["SyncService", "WatchlistService", "TasteService"]

@@ -6,7 +6,7 @@ priority: P1
 category: dev
 created: "2026-11-06"
 updated: "2026-11-14"
-next_action: "Zrealizować Etap 2 (Profil gustu): serwis analizy historii i preferencji, generowanie i wersjonowanie profilu JSON (wagi, confidence) oraz mechanizm ręcznej korekty profilu"
+next_action: "Zrealizować Etap 3 (Rekomendacje): integracja z TMDB, wyszukiwanie kandydatów, filtry anty-rekomendacji, ranking regułowy + ocena semantyczna LLM, dywersyfikacja i rejestracja przebiegów"
 tags:
   - movie-recommendation
   - simkl
@@ -27,7 +27,7 @@ Jasno zdefiniowany cel końcowy projektu (MVP):
 - [x] Działający skrypt PoC (Simkl Taste Engine) walidujący jakość profilowania i rekomendacji LLM.
 - [x] Stabilny szkielet aplikacji w `FastAPI` z bazą `SQLite` i migracjami.
 - [x] Integracja z Simkl: autoryzacja, synchronizacja biblioteki/ocen/Plan to Watch, idempotentny zapis wyłącznie zaakceptowanych pozycji.
-- [ ] Wersjonowany profil gustu użytkownika z możliwością ręcznej korekty.
+- [x] Wersjonowany profil gustu użytkownika z możliwością ręcznej korekty.
 - [ ] Silnik rekomendacji integrujący TMDB i LLM (10 filmów, 5 seriali na edycję) z uzasadnieniami i bez duplikatów.
 - [ ] Prosty interfejs użytkownika do przeglądu i zatwierdzania/odrzucania propozycji.
 - [ ] Serwer MCP (STDIO dla Antigravity, HTTPS dla ChatGPT) udostępniający te same serwisy domenowe.
@@ -62,27 +62,36 @@ Jasno zdefiniowany cel końcowy projektu (MVP):
     - Zaimplementowano serwis kontrolowanego zapisu (`app/services/watchlist.py`), gwarantujący nienegocjowalną zasadę: zapis do Simkl (`plantowatch`) wymaga uprzedniej, jawnej akceptacji użytkownika (`status == 'accepted'`), a wielokrotne wywołania są w pełni idempotentne.
     - Zaimplementowano endpointy REST API (`app/api/v1/sync.py`): `POST /api/sync/simkl` oraz `GET /api/sync/simkl/status`.
     - Rozszerzono zestaw testów automatycznych do 32 testów (`pytest`) z pokryciem 100% dla klienta Simkl, serwisu synchronizacji, idempotencji zapisu oraz endpointów API.
+  - Zrealizowano i przetestowano **Etap 2 (Profil gustu)**:
+    - Zaimplementowano rygorystyczne schematy domenowe Pydantic (`app/schemas/taste.py`): rozdzielenie wag cech (`weight`) od pewności modelu (`confidence`), rozdzielenie preferencji stałych od chwilowych (`temporary_interests`), ustrukturyzowane motywy, reżyserzy/twórcy oraz antypreferencje.
+    - Zaimplementowano moduł integracyjny LLM (`app/integrations/llm/`): protokół `LLMProvider` oraz asynchronicznego klienta `GeminiLLMClient` z walidacją JSON, automatycznym fallbackiem modeli (`gemini-2.5-flash`, `gemini-2.0-flash`, `gemini-1.5-flash`) oraz mapowaniem błędów (`AuthRequiredException`, `RateLimitedException`, `UpstreamErrorException`).
+    - Zaimplementowano domenowy serwis `TasteService` (`app/services/taste.py`): ekstrakcja historii z bazy SQLite (`watch_history` + `media_items`), kalkulacja proweniencji (`based_on_sync_at`), promptowanie LLM i walidacja Pydantic, atomowe wersjonowanie (`v1.0-gemini`, `v2.0-gemini`), zarządzanie unikalną flagą `active=True`, audyt historii wersji oraz mechanizm ręcznej korekty (`v1.1-manual`) wraz z rejestracją notatki zmiany (`change_note`).
+    - Zaimplementowano endpointy REST API (`app/api/v1/profile.py`): `GET /api/profile`, `POST /api/profile/generate`, `GET /api/profile/versions`, `GET /api/profile/versions/{version}`, `PUT /api/profile` oraz `POST /api/profile/versions/{version}/activate`.
+    - Rozszerzono zestaw testów automatycznych do **58 testów** (`pytest`) przechodzących w 100%, z pokryciem testowym schematów, klienta LLM (mock transport), serwisu gustu oraz endpointów API.
 - **Kluczowe moduły**:
   - `app/main.py` — fabryka aplikacji FastAPI, lifespan, middleware i obsługa błędów
   - `app/core/` — konfiguracja Pydantic Settings, silnik bazy SQLite i logowanie
-  - `app/models/` — modele SQLAlchemy 2.0 (`media_items`, `watch_history`, `recommendations`, itp.)
+  - `app/models/` — modele SQLAlchemy 2.0 (`media_items`, `watch_history`, `taste_profiles`, itp.)
   - `app/integrations/simkl.py` — asynchroniczny klient API Simkl
+  - `app/integrations/llm/` — adaptery LLM (`LLMProvider`, `GeminiLLMClient`)
+  - `app/schemas/taste.py` — schematy profilu gustu, wag, ręcznej korekty
   - `app/services/sync.py` — synchronizacja przyrostowa z Simkl do SQLite
   - `app/services/watchlist.py` — kontrolowany i idempotentny zapis pozycji do Simkl
-  - `app/api/` — endpointy REST (w tym `/api/health`, `/api/sync/simkl`)
+  - `app/services/taste.py` — analiza historii, wersjonowanie profilu i ręczna korekta
+  - `app/api/` — endpointy REST (w tym `/api/health`, `/api/sync/simkl`, `/api/profile`)
   - `migrations/` — migracje bazy danych Alembic
   - `scripts/poc_taste_engine.py` — samodzielny skrypt badawczy PoC
   - `scripts/get_simkl_token.py` — asystent autoryzacji OAuth 2.0 Simkl Device Flow
-  - `tests/` — testy jednostkowe i integracyjne (32 testy)
+  - `tests/` — testy jednostkowe i integracyjne (58 testów)
   - `data/` — lokalna baza SQLite i pliki wyjściowe
 
 ## Najbliższy Krok (Next Action)
 
-> Zrealizować Etap 2 (Profil gustu): serwis analizy historii i preferencji, generowanie i wersjonowanie profilu JSON (wagi, confidence) oraz mechanizm ręcznej korekty profilu.
+> Zrealizować Etap 3 (Rekomendacje): integracja z TMDB (kandydaci i metadane), filtry anty-rekomendacji (obejrzane, Plan to Watch, odrzucone), ranking regułowy + ocena semantyczna LLM, dywersyfikacja i rejestracja przebiegu w bazie.
 
 ## Blokady (Blockers)
 
-Brak. Integracja z Simkl oraz synchronizacja danych biblioteki w pełni zaimplementowana i przetestowana.
+Brak. Profil gustu użytkownika, wersjonowanie, ręczna korekta oraz integracja LLM w pełni zaimplementowane i przetestowane.
 
 ## Backlog Zadań
 
@@ -105,9 +114,9 @@ Brak. Integracja z Simkl oraz synchronizacja danych biblioteki w pełni zaimplem
 - [x] Idempotentny zapis zaakceptowanych pozycji z testami
 
 ### Etap 2: Profil gustu
-- [ ] Serwis analizy historii i preferencji
-- [ ] Generowanie i wersjonowanie profilu JSON (wagi, confidence)
-- [ ] Możliwość ręcznej korekty profilu
+- [x] Serwis analizy historii i preferencji
+- [x] Generowanie i wersjonowanie profilu JSON (wagi, confidence)
+- [x] Możliwość ręcznej korekty profilu
 
 ### Etap 3: Rekomendacje
 - [ ] Integracja z TMDB (wyszukiwanie kandydatów, metadane)
@@ -166,3 +175,13 @@ Brak. Integracja z Simkl oraz synchronizacja danych biblioteki w pełni zaimplem
   5. Dodano endpointy REST API: `POST /api/sync/simkl` oraz `GET /api/sync/simkl/status` z wstrzykiwaniem zależności `Annotated[Session, Depends(get_db)]`.
   6. Dodano zestaw testów automatycznych (łącznie 32 testy przechodzące w 100%), mockujący transport HTTP bez zewnętrznych bibliotek (wbudowany `httpx.MockTransport`).
 - **Uzasadnienie**: Spełnienie kryteriów akceptacji Etapu 1 z ROADMAP.md: rzeczywiste dane są poprawnie pobierane i zapisywane lokalnie, a zapis do Simkl jest kontrolowany i idempotentny.
+
+### 2026-11-14 — Wdrożenie Etapu 2 (Taste Profile Engine & Versioning)
+- **Decyzja / Zmiana**:
+  1. Zaimplementowano rygorystyczne schematy Pydantic (`app/schemas/taste.py`) z rozdzieleniem wagi cechy (`weight`) od pewności modelu (`confidence`), rozdzieleniem zainteresowań stałych i chwilowych oraz metadanymi proweniencji.
+  2. Utworzono moduł adaptera LLM (`app/integrations/llm/`) z protokołem `LLMProvider` i asynchronicznym klientem `GeminiLLMClient`, z trybem `response_mime_type="application/json"` oraz automatycznym fallbackiem wersji modeli (`gemini-2.5-flash`, `gemini-2.0-flash`, `gemini-1.5-flash`).
+  3. Zaimplementowano `TasteService` (`app/services/taste.py`): agregacja historii z bazy, powiązanie ze znacznikiem `based_on_sync_at` synchronizacji Simkl, atomowe wersjonowanie (`v1.0-gemini`, `v2.0-gemini`), zarządzanie unikalną flagą `active=True` oraz audyt historii wersji.
+  4. Wprowadzono mechanizm ręcznej korekty (`adjust_profile`), generujący nowe wersje manualne (np. `v1.1-manual`) i rejestrujący notatki modyfikacji (`change_note`).
+  5. Dodano pełny zestaw endpointów REST API: `GET /api/profile`, `POST /api/profile/generate`, `GET /api/profile/versions`, `GET /api/profile/versions/{version}`, `PUT /api/profile` oraz `POST /api/profile/versions/{version}/activate`.
+  6. Rozszerzono zestaw testów automatycznych do 58 testów przechodzących w 100% (`pytest`) oraz pełną zgodność lintera `ruff`.
+- **Uzasadnienie**: Spełnienie kryteriów akceptacji Etapu 2 z ROADMAP.md: profil ma uzasadnienie i można jednoznacznie odtworzyć, z jakich danych powstał, a użytkownik ma pełną kontrolę i możliwość ręcznej modyfikacji wag i reguł.
