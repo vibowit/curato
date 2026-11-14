@@ -40,7 +40,7 @@ async def main():
             sync_service = SyncService(db_session=db)
             sync_result = await sync_service.sync_simkl()
             print(
-                f"      ✅ Zsynchronizowano: {sync_result.items_synced} pozycji "
+                f"      ✅ Zsynchronizowano: {sync_result.total_synced} pozycji "
                 f"(status: {sync_result.status})"
             )
         else:
