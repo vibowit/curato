@@ -18,6 +18,10 @@ większą zmianą.
 -   Dostępność streamingowa jest poza zakresem.
 -   Nie twórz własnego katalogu filmów ani nie wprowadzaj ML/embeddingów
     bez uzasadnienia i decyzji użytkownika.
+-   Strategia repozytorium i publikacji:
+    -   GitHub jest jedynym kanonicznym źródłem prawdy (`origin`), udostępnianym publicznie jako portfolio/showcase bez obsługi zgłoszeń (Issues i PRs wyłączone).
+    -   Własna instancja Gitea działa wyłącznie jako w 100% pasywny mirror (Pull Mirror) pod backup i deployment w sieci LAN (Proxmox).
+    -   Rezygnacja z publikacji na Docker Hub; obrazy budowane są lokalnie na serwerze docelowym (lub GHCR).
 
 ## Zasady implementacji
 

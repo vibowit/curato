@@ -42,7 +42,7 @@ sam decyduje, co dodać do Simkl.
 
 -   Podgląd oficjalnych zwiastunów (trailers z TMDB / YouTube) bezpośrednio w panelu rekomendacji przed podjęciem decyzji.
 -   Konteneryzacja i wdrożenie jako stała, bezobsługowa usługa domowa w środowisku Proxmox VE (Docker Compose, montowanie wolumenu danych, restart-policy).
--   Przygotowanie projektu do upublicznienia na GitHubie (Open-Source) oraz zautomatyzowana publikacja oficjalnych obrazów na Docker Hub.
+-   Przygotowanie projektu do upublicznienia na GitHubie (jako showcase inżynierski bez obsługi zgłoszeń) oraz konfiguracja pasywnego mirrora Gitea pod Proxmox; rezygnacja z publikacji na Docker Hub na rzecz lokalnego buildu.
 
 ## Poza zakresem MVP
 

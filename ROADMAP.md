@@ -92,16 +92,18 @@ historii. (Ukończono pomyślnie)
 
 **Akceptacja:** Aplikacja działa jako stała, stabilna usługa kontenerowa w środowisku Proxmox, migracje wykonują się bezobsługowo przy starcie, a dane są bezpiecznie persystowane.
 
-## Etap 8 -- Przygotowanie do upublicznienia (GitHub) i publikacja na Docker Hub
+## Etap 8 -- Upublicznienie kodu (GitHub Showcase) i lokalny Mirror (Gitea) [Bez Docker Hub]
 
--   [ ] Audyt bezpieczeństwa repozytorium: weryfikacja `.gitignore`, upewnienie się o braku sekretów w historii git, szablony `.env.example`.
--   [ ] Profesjonalna dokumentacja `README.md` (opis projektu, badges, architektura, instrukcja szybkiego startu Docker Compose, konfiguracja Simkl/TMDB/Gemini).
--   [ ] Dodanie plików Open-Source: plik licencji (np. MIT), `CONTRIBUTING.md`, szablon zgłaszania problemów (issue template).
--   [ ] Przygotowanie workflow GitHub Actions CI/CD:
-    - automatyczne testy (`pytest`) i lint (`ruff`) przy Pull Requestach i commitach do `main`,
-    - automatyczny build wieloplatformowego obrazu kontenera (`linux/amd64`, `linux/arm64`) i publikacja wydań (release tags) na Docker Hub (oraz opcjonalnie GHCR).
+-   [ ] Audyt bezpieczeństwa repozytorium: weryfikacja `.gitignore`, wykluczenie katalogu `/data/` i lokalnych baz SQLite, audyt sekretów w historii git (`gitleaks`), szablony `.env.example`.
+-   [ ] Przygotowanie czystego commita startowego (`orphan branch`) dla publicznego repozytorium na GitHubie.
+-   [ ] Profesjonalna dokumentacja `README.md` (opis projektu, badges, architektura, instrukcja wdrożenia Docker Compose na Proxmox, konfiguracja Simkl/TMDB/Gemini/MCP).
+-   [ ] Wyłączenie obsługi zgłoszeń (Issues, Discussions, PR) w repozytorium GitHub oraz dodanie noty w `CONTRIBUTING.md` / `README.md` o charakterze projektu (bespoke / showcase portfolio).
+-   [ ] Dodanie pliku licencji (np. MIT z zastrzeżeniem "as-is").
+-   [ ] Przygotowanie workflow GitHub Actions CI/CD (automatyczny lint `ruff` i testy `pytest` przy commitach do `main`).
+-   [ ] Konfiguracja własnej instancji Gitea jako automatycznego, pasywnego Pull Mirror z GitHuba (backup off-cloud i źródło deploymentu LAN dla Proxmoxa).
+-   [ ] Formalna rezygnacja z publikacji na publicznym Docker Hub (kontenery budowane lokalnie na Proxmoxie ze źródeł pobranych z Gitea).
 
-**Akceptacja:** Czyste, w pełni udokumentowane repozytorium gotowe do publikacji jako projekt Open Source na GitHubie, ze zautomatyzowanym procesem wydawniczym obrazu na Docker Hub.
+**Akceptacja:** Czyste, bezpieczne repozytorium na GitHubie pełniące rolę publicznego portfolio bez narzutu obsługi społeczności, automatycznie synchronizowany lokalny mirror na Gitea pod Proxmox oraz zautomatyzowane testy CI/CD.
 
 ## Przyszłe rozszerzenia (Future Backlog)
 

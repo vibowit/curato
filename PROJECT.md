@@ -176,13 +176,15 @@ Brak. Wszystkie etapy MVP (PoC, 0, 1, 2, 3, 4, 5) są w pełni zaimplementowane 
 - [ ] Procedura wdrożenia na Proxmox VE (kontener LXC Debian z Dockerem, kopie zapasowe wolumenu w PBS/VZDump)
 - [ ] Konfiguracja Reverse Proxy (Nginx Proxy Manager / Caddy) z certyfikatem SSL pod bezpieczny dostęp zdalny i MCP SSE dla ChatGPT
 
-### Etap 8: Przygotowanie do upublicznienia (GitHub) i publikacja na Docker Hub
-- [ ] Audyt bezpieczeństwa repozytorium: weryfikacja `.gitignore`, brak sekretów w historii git, szablony `.env.example`
-- [ ] Profesjonalna dokumentacja `README.md` (architektura, badges, instrukcja szybkiego startu Docker Compose, konfiguracja Simkl/TMDB/Gemini)
-- [ ] Dodanie plików Open-Source: licencja MIT, `CONTRIBUTING.md`, szablony zgłoszeń GitHub Issues
-- [ ] Konfiguracja GitHub Actions CI/CD:
-  - automatyczny lint (`ruff`) i testy (`pytest`) przy Pull Requestach i commitach
-  - automatyczny build wieloarchitektonicznego obrazu (`linux/amd64`, `linux/arm64`) i publikacja wydań na Docker Hub
+### Etap 8: Upublicznienie kodu (GitHub Showcase) i lokalny Mirror (Gitea) [Bez Docker Hub]
+- [ ] Audyt bezpieczeństwa repozytorium: weryfikacja `.gitignore`, wykluczenie katalogu `/data/` i bazy SQLite, skanowanie historii git (`gitleaks`), szablon `.env.example`
+- [ ] Przygotowanie czystego commita startowego (`orphan branch`) dla publicznego repozytorium na GitHubie
+- [ ] Profesjonalna dokumentacja `README.md` (architektura, badges, instrukcja wdrożenia na Proxmox, konfiguracja Simkl/TMDB/Gemini/MCP)
+- [ ] Wyłączenie obsługi zgłoszeń (Issues, Discussions, PR) w repozytorium GitHub oraz dodanie noty w `CONTRIBUTING.md` / `README.md` (projekt bespoke / portfolio)
+- [ ] Dodanie pliku licencji (np. MIT z klauzulą as-is)
+- [ ] Konfiguracja GitHub Actions CI/CD: automatyczny lint (`ruff`) i testy (`pytest`) przy commitach do `main`
+- [ ] Konfiguracja własnej instancji Gitea jako automatycznego, pasywnego Pull Mirror z GitHuba (backup i źródło deploymentu w LAN)
+- [ ] Formalna rezygnacja z publikacji na publicznym Docker Hub (kontenery budowane lokalnie na Proxmoxie ze źródeł pobranych z Gitea)
 
 ### Przyszłe rozszerzenia (Future Backlog)
 - [ ] Powiadomienia Pushover / Telegram o wygenerowaniu nowej edycji przez scheduler
@@ -296,3 +298,11 @@ Brak. Wszystkie etapy MVP (PoC, 0, 1, 2, 3, 4, 5) są w pełni zaimplementowane 
   1. Zaktualizowano `AGENTS.md` o precyzyjną regułę izolacji sesji bazy SQLite w zadaniach asynchronicznych i tle (zapobieganie wyciekom sesji i blokadom bazy przy współbieżności) oraz wymóg stosowania wyłącznie wbudowanego `httpx.MockTransport` w testach jednostkowych.
   2. Utworzono dedykowany skill workspace `.agents/skills/docker-proxmox-sqlite/SKILL.md` definiujący procedurę uprawnień wolumenów SQLite WAL (UID 1000 `appuser`), automatycznych migracji Alembic w `entrypoint.sh` oraz bezbuforowej konfiguracji Reverse Proxy (Caddy/Nginx) dla streamingu SSE serwera MCP (ChatGPT).
 - **Uzasadnienie**: Zapewnienie powtarzalnych wzorców pracy dla agentów AI przed rozpoczęciem prac nad Etapami 6 i 7.
+
+### 2026-11-14 — Strategia repozytoriów (GitHub Primary + Gitea Mirror) i rezygnacja z Docker Hub
+- **Decyzja / Zmiana**:
+  1. **Rezygnacja z publikacji na Docker Hub**: Projekt jest dedykowanym, jednoosobowym systemem (bespoke/single-user) z wrażliwymi tokenami OAuth, specyficznym anty-filtrem i serwerem MCP. Publiczny obraz na Docker Hub niósłby ryzyko wycieku sekretów/danych, narzut utrzymaniowy (CVE, multi-arch) oraz konieczność budowy multi-tenancy. Kontenery będą budowane lokalnie na serwerze Proxmox (`docker compose build`) z wykorzystaniem cache i `uv`.
+  2. **GitHub jako Primary / Single Source of Truth**: Kod źródłowy zostanie opublikowany na GitHubie jako wzorcowe portfolio i referencyjna implementacja MCP + LLM + FastAPI z darmowym CI/CD (GitHub Actions dla `pytest` i `ruff`).
+  3. **Mitygacja ryzyk GitHuba**: Wyłączenie sekcji Issues, Discussions i Pull Requests w ustawieniach repozytorium (ochrona przed narzutem obsługi społeczności), bezwzględne ignorowanie bazy i danych (`/data/`) oraz publikacja czystej historii (`orphan branch`) z audytem `gitleaks`.
+  4. **Własna Gitea jako Pasywny Mirror (Pull Mirror)**: Gitea w homelabie będzie automatycznie ściągać commity z GitHuba (zero bezpośrednich pushów z komputera, brak ryzyka rozjechania stanu). Służy jako suwerenny backup off-cloud oraz punkt pobierania kodu przez Proxmox w sieci LAN bez zależności od łącza internetowego.
+- **Uzasadnienie**: Maksymalizacja korzyści inżynierskich i portfolio przy jednoczesnym wyeliminowaniu narzutu operacyjnego i ryzyk bezpieczeństwa.

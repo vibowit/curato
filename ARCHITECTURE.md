@@ -74,6 +74,20 @@ data/
 -   Testy adapterów z mockami oraz testy integracyjne na koncie
     testowym.
 
+## Strategia repozytoriów, backupu i rejestrów
+
+-   **GitHub (Primary / Single Source of Truth)**:
+    -   Publiczne repozytorium służące jako showcase inżynierski i portfolio.
+    -   Brak narzutu społeczności: sekcje Issues, Discussions i Pull Requests są wyłączone lub zablokowane.
+    -   Darmowe GitHub Actions do automatycznych testów (`pytest`) i lintingu (`ruff`).
+-   **Gitea (Pasywny Mirror / LAN Deployment / Off-cloud Backup)**:
+    -   Własna instancja Gitea w homelabie skonfigurowana jako automatyczny Pull Mirror z GitHuba.
+    -   Nigdy nie wykonuje się bezpośrednich pushów do Gitea ze stacji roboczej (ochrona przed rozjechaniem gałęzi).
+    -   Proxmox (LXC/VM) pobiera kod i buduje kontenery bezpośrednio w sieci LAN z Gitea (odporność na brak łącza internetowego).
+-   **Rezygnacja z Docker Hub**:
+    -   Brak publikacji na publicznym Docker Hub ze względów bezpieczeństwa, specyfiki pojedynczego użytkownika (bespoke) oraz minimalizacji narzutu utrzymania.
+    -   Kontenery budowane lokalnie na serwerze Proxmox (`docker compose build`) z wykorzystaniem cache i `uv`.
+
 ## Decyzje do potwierdzenia podczas implementacji
 
 Sprawdź aktualne wersje endpointów, OAuth flow, zakresy, limity i
