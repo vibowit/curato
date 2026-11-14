@@ -8,6 +8,7 @@ from app.integrations.tmdb import (
     TMDB_GENRE_NAMES,
     TMDB_MOVIE_GENRES,
     TMDB_TV_GENRES,
+    TMDBAuthError,
     TMDBClient,
 )
 from app.models.history import WatchHistory
@@ -156,6 +157,8 @@ class DiscoveryService:
                         cand = self._normalize_show(item, strategy="similar_to_favorites")
                         if cand and (cand.media_type, cand.tmdb_id) not in candidates_map:
                             candidates_map[(cand.media_type, cand.tmdb_id)] = cand
+            except TMDBAuthError:
+                raise
             except Exception as e:
                 logger.debug(
                     "Failed getting recommendations for %s (%d): %s", fav.title, fav.tmdb_id, e
@@ -181,6 +184,8 @@ class DiscoveryService:
                         cand = self._normalize_movie(item, strategy="profile_genres")
                         if cand and (cand.media_type, cand.tmdb_id) not in candidates_map:
                             candidates_map[(cand.media_type, cand.tmdb_id)] = cand
+                except TMDBAuthError:
+                    raise
                 except Exception as e:
                     logger.debug("Error discovering movies for genre %s: %s", g_name, e)
 
@@ -197,6 +202,8 @@ class DiscoveryService:
                         cand = self._normalize_show(item, strategy="profile_genres")
                         if cand and (cand.media_type, cand.tmdb_id) not in candidates_map:
                             candidates_map[(cand.media_type, cand.tmdb_id)] = cand
+                except TMDBAuthError:
+                    raise
                 except Exception as e:
                     logger.debug("Error discovering shows for genre %s: %s", g_name, e)
 
@@ -216,6 +223,8 @@ class DiscoveryService:
                         cand = self._normalize_movie(item, strategy="director", director=creator)
                         if cand and (cand.media_type, cand.tmdb_id) not in candidates_map:
                             candidates_map[(cand.media_type, cand.tmdb_id)] = cand
+            except TMDBAuthError:
+                raise
             except Exception as e:
                 logger.debug("Error searching creator %s: %s", creator, e)
 
@@ -242,6 +251,8 @@ class DiscoveryService:
                 cand = self._normalize_show(item, strategy="exploration")
                 if cand and (cand.media_type, cand.tmdb_id) not in candidates_map:
                     candidates_map[(cand.media_type, cand.tmdb_id)] = cand
+        except TMDBAuthError:
+            raise
         except Exception as e:
             logger.debug("Error during exploration discovery: %s", e)
 

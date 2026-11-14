@@ -133,6 +133,17 @@ class TMDBClient:
             else None
         )
 
+        # Detect if user pasted v4 JWT Bearer token into TMDB_API_KEY
+        if raw_key and raw_key.startswith("eyJ") and not raw_token:
+            raw_token = raw_key
+            raw_key = None
+
+        # Ignore placeholder values from .env.example
+        if raw_key and ("your_" in raw_key or "here" in raw_key):
+            raw_key = None
+        if raw_token and ("your_" in raw_token or "here" in raw_token):
+            raw_token = None
+
         self.api_key = raw_key
         self.read_access_token = raw_token
         self.base_url = base_url.rstrip("/")
@@ -187,6 +198,12 @@ class TMDBClient:
         params: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         """Performs HTTP request with rate limiting and exponential backoff retry."""
+        if not self.read_access_token and not self.api_key:
+            raise TMDBAuthError(
+                "Brak poprawnego klucza TMDB_API_KEY w pliku .env "
+                "(brak wartości lub domyślny placeholder 'your_tmdb_api_key_here')."
+            )
+
         url = endpoint if endpoint.startswith("/") else f"/{endpoint}"
         query_params = self._prepare_params(params)
 
