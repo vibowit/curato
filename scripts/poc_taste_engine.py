@@ -289,46 +289,63 @@ class GeminiProvider:
     API_ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/models"
 
     def __init__(self, api_key: Optional[str] = None, model: Optional[str] = None):
-        self.api_key = api_key or os.environ.get("GEMINI_API_KEY")
-        self.model = model or os.environ.get("GEMINI_MODEL", "gemini-2.5-flash")
+        self.api_key = (api_key or os.environ.get("GEMINI_API_KEY", "")).strip().strip("'\"")
+        raw_model = (model or os.environ.get("GEMINI_MODEL", "gemini-1.5-flash")).strip().strip("'\"")
+        # Normalize model name if user specified 2.5 or flash-latest
+        if "2.5" in raw_model:
+            raw_model = "gemini-1.5-flash"
+        self.model = raw_model
 
     def generate_json(self, prompt: str) -> Dict[str, Any]:
         """Calls Gemini with system instructions to return pure JSON."""
         if not self.api_key:
             raise ValueError("GEMINI_API_KEY is not set.")
 
-        url = f"{self.API_ENDPOINT}/{self.model}:generateContent?key={self.api_key}"
-        payload = {
-            "contents": [
-                {
-                    "parts": [{"text": prompt}]
-                }
-            ],
-            "generationConfig": {
-                "temperature": 0.3,
-                "responseMimeType": "application/json",
-            },
-        }
+        models_to_try = [self.model]
+        if "gemini-1.5-flash" not in models_to_try:
+            models_to_try.append("gemini-1.5-flash")
 
-        req = urllib.request.Request(
-            url,
-            data=json.dumps(payload).encode("utf-8"),
-            headers={"Content-Type": "application/json"},
-            method="POST",
-        )
+        last_error = None
+        for m in models_to_try:
+            url = f"{self.API_ENDPOINT}/{m}:generateContent?key={self.api_key}"
+            payload = {
+                "contents": [
+                    {
+                        "parts": [{"text": prompt}]
+                    }
+                ],
+                "generationConfig": {
+                    "temperature": 0.3,
+                    "responseMimeType": "application/json",
+                },
+            }
 
-        try:
-            with urllib.request.urlopen(req, timeout=30) as resp:
-                data = json.loads(resp.read().decode("utf-8"))
-                text = (
-                    data.get("candidates", [{}])[0]
-                    .get("content", {})
-                    .get("parts", [{}])[0]
-                    .get("text", "{}")
-                )
-                return json.loads(text)
-        except urllib.error.URLError as e:
-            raise RuntimeError(f"Gemini API error: {e}")
+            req = urllib.request.Request(
+                url,
+                data=json.dumps(payload).encode("utf-8"),
+                headers={"Content-Type": "application/json"},
+                method="POST",
+            )
+
+            try:
+                with urllib.request.urlopen(req, timeout=30) as resp:
+                    data = json.loads(resp.read().decode("utf-8"))
+                    text = (
+                        data.get("candidates", [{}])[0]
+                        .get("content", {})
+                        .get("parts", [{}])[0]
+                        .get("text", "{}")
+                    )
+                    return json.loads(text)
+            except urllib.error.HTTPError as e:
+                err_body = e.read().decode("utf-8")
+                last_error = f"HTTP {e.code} ({m}): {err_body}"
+                continue
+            except urllib.error.URLError as e:
+                last_error = f"Network error ({m}): {e}"
+                continue
+
+        raise RuntimeError(f"Gemini API error: {last_error}")
 
 
 # ==========================================
