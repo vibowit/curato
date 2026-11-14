@@ -3,8 +3,8 @@
 
 Simkl Auth V2 uses standard OAuth 2.0 Device Authorization Grant (RFC 8628):
 1. POST https://api.simkl.com/oauth2/device with client_id.
-2. User opens verification_uri (https://simkl.com/pin) and enters user_code (or opens verification_url).
-3. Script polls POST https://api.simkl.com/oauth2/token until user approves.
+2. User opens verification_uri (https://simkl.com/pin) and enters user_code.
+3. Script polls POST https://api.simkl.com/oauth2/token with client_id and client_secret until user approves.
 4. Updates .env with SIMKL_USER_TOKEN and detects SIMKL_USERNAME.
 """
 
@@ -63,6 +63,8 @@ def main():
     env = load_env(env_path)
 
     client_id = env.get("SIMKL_CLIENT_ID") or os.environ.get("SIMKL_CLIENT_ID")
+    client_secret = env.get("SIMKL_CLIENT_SECRET") or env.get("SIMKL_USER_TOKEN") or os.environ.get("SIMKL_CLIENT_SECRET")
+
     if not client_id or client_id.startswith("your_"):
         print("❌ Błąd: SIMKL_CLIENT_ID nie jest ustawiony w pliku .env!")
         print("Wpisz swój Client ID z panelu Simkl do pliku .env i spróbuj ponownie.")
@@ -74,7 +76,8 @@ def main():
     print("Pobieram kod urządzenia z Simkl API (POST /oauth2/device)...")
 
     device_url = "https://api.simkl.com/oauth2/device"
-    form_data = urllib.parse.urlencode({"client_id": client_id}).encode("utf-8")
+    form_params = {"client_id": client_id}
+    form_data = urllib.parse.urlencode(form_params).encode("utf-8")
     req = urllib.request.Request(
         device_url,
         data=form_data,
@@ -122,6 +125,9 @@ def main():
             "client_id": client_id,
             "device_code": device_code,
         }
+        if client_secret:
+            token_params["client_secret"] = client_secret
+
         token_data = urllib.parse.urlencode(token_params).encode("utf-8")
         token_req = urllib.request.Request(
             token_url,
@@ -162,14 +168,12 @@ def main():
                         print(f"[Ostrzeżenie] Nie udało się automatycznie pobrać nazwy użytkownika ({ue})")
 
                     # Aktualizujemy .env
-                    updates = {"SIMKL_USER_TOKEN": access_token}
+                    updates = {
+                        "SIMKL_USER_TOKEN": access_token,
+                        "SIMKL_CLIENT_SECRET": client_secret or "",
+                    }
                     if username:
                         updates["SIMKL_USERNAME"] = username
-
-                    # Jeśli w SIMKL_USER_TOKEN był wklejony client_secret, przenieśmy go
-                    old_token = env.get("SIMKL_USER_TOKEN")
-                    if old_token and old_token != access_token and not env.get("SIMKL_CLIENT_SECRET"):
-                        updates["SIMKL_CLIENT_SECRET"] = old_token
 
                     update_env_file(env_path, updates)
                     print(f"✅ Zaktualizowano {env_path} (ustawiono SIMKL_USER_TOKEN i SIMKL_USERNAME).")
