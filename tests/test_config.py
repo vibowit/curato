@@ -29,3 +29,24 @@ def test_secrets_masking():
 
     # But secret can be retrieved explicitly when needed
     assert settings.SIMKL_CLIENT_SECRET.get_secret_value() == "my_secret_token"
+
+
+def test_effective_simkl_token():
+    s1 = Settings(SIMKL_USER_TOKEN=SecretStr("user_token_val"), _env_file=None)
+    assert s1.effective_simkl_token is not None
+    assert s1.effective_simkl_token.get_secret_value() == "user_token_val"
+
+    s2 = Settings(
+        SIMKL_USER_TOKEN=None,
+        SIMKL_ACCESS_TOKEN=SecretStr("access_token_val"),
+        _env_file=None,
+    )
+    assert s2.effective_simkl_token is not None
+    assert s2.effective_simkl_token.get_secret_value() == "access_token_val"
+
+    s3 = Settings(
+        SIMKL_USER_TOKEN=SecretStr("user_val"),
+        SIMKL_ACCESS_TOKEN=SecretStr("access_val"),
+        _env_file=None,
+    )
+    assert s3.effective_simkl_token.get_secret_value() == "user_val"

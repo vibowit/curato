@@ -6,7 +6,7 @@ priority: P1
 category: dev
 created: "2026-11-06"
 updated: "2026-11-14"
-next_action: "Zrealizować Etap 1 (Simkl): klient API Simkl, pobieranie historii, ocen i listy Plan to Watch, przyrostowa synchronizacja do SQLite oraz idempotentny zapis zaakceptowanych pozycji"
+next_action: "Zrealizować Etap 2 (Profil gustu): serwis analizy historii i preferencji, generowanie i wersjonowanie profilu JSON (wagi, confidence) oraz mechanizm ręcznej korekty profilu"
 tags:
   - movie-recommendation
   - simkl
@@ -26,7 +26,7 @@ Prywatny system rekomendacji filmów i seriali oparty na Simkl, profilu gustu u�
 Jasno zdefiniowany cel końcowy projektu (MVP):
 - [x] Działający skrypt PoC (Simkl Taste Engine) walidujący jakość profilowania i rekomendacji LLM.
 - [x] Stabilny szkielet aplikacji w `FastAPI` z bazą `SQLite` i migracjami.
-- [ ] Integracja z Simkl: autoryzacja, synchronizacja biblioteki/ocen/Plan to Watch, idempotentny zapis wyłącznie zaakceptowanych pozycji.
+- [x] Integracja z Simkl: autoryzacja, synchronizacja biblioteki/ocen/Plan to Watch, idempotentny zapis wyłącznie zaakceptowanych pozycji.
 - [ ] Wersjonowany profil gustu użytkownika z możliwością ręcznej korekty.
 - [ ] Silnik rekomendacji integrujący TMDB i LLM (10 filmów, 5 seriali na edycję) z uzasadnieniami i bez duplikatów.
 - [ ] Prosty interfejs użytkownika do przeglądu i zatwierdzania/odrzucania propozycji.
@@ -56,24 +56,33 @@ Jasno zdefiniowany cel końcowy projektu (MVP):
     - Skonfigurowano migracje bazy danych w `Alembic` oraz wygenerowano i zweryfikowano pierwszą migrację `b00467105c7b_initial_schema.py`.
     - Zaimplementowano fabrykę aplikacji `FastAPI`, middleware korelacji `X-Request-ID`, ustandaryzowaną obsługę błędów wg `API_CONTRACTS.md` oraz endpoint `GET /api/health`.
     - Przygotowano zestaw testów automatycznych w `pytest` (16 testów przechodzi w 100%) oraz czystą weryfikację `ruff`.
+  - Zrealizowano i przetestowano **Etap 1 (Simkl)**:
+    - Zaimplementowano asynchronicznego klienta Simkl API (`app/integrations/simkl.py`) z nagłówkami autoryzacji (`simkl-api-key`, `Authorization: Bearer`), obsługą limitów (10 GET/s, 1 POST/s), retry z backoffem oraz ścisłym śledzeniem liczby operacji zapisu (`write_calls_count`).
+    - Zaimplementowano serwis synchronizacji (`app/services/sync.py`) z obsługą pełnej i przyrostowej synchronizacji (`sync_state.last_success_at`), deduplikacją i upsertem do tabel `media_items` i `watch_history`.
+    - Zaimplementowano serwis kontrolowanego zapisu (`app/services/watchlist.py`), gwarantujący nienegocjowalną zasadę: zapis do Simkl (`plantowatch`) wymaga uprzedniej, jawnej akceptacji użytkownika (`status == 'accepted'`), a wielokrotne wywołania są w pełni idempotentne.
+    - Zaimplementowano endpointy REST API (`app/api/v1/sync.py`): `POST /api/sync/simkl` oraz `GET /api/sync/simkl/status`.
+    - Rozszerzono zestaw testów automatycznych do 32 testów (`pytest`) z pokryciem 100% dla klienta Simkl, serwisu synchronizacji, idempotencji zapisu oraz endpointów API.
 - **Kluczowe moduły**:
   - `app/main.py` — fabryka aplikacji FastAPI, lifespan, middleware i obsługa błędów
   - `app/core/` — konfiguracja Pydantic Settings, silnik bazy SQLite i logowanie
   - `app/models/` — modele SQLAlchemy 2.0 (`media_items`, `watch_history`, `recommendations`, itp.)
-  - `app/api/` — endpointy REST (w tym `GET /api/health`)
+  - `app/integrations/simkl.py` — asynchroniczny klient API Simkl
+  - `app/services/sync.py` — synchronizacja przyrostowa z Simkl do SQLite
+  - `app/services/watchlist.py` — kontrolowany i idempotentny zapis pozycji do Simkl
+  - `app/api/` — endpointy REST (w tym `/api/health`, `/api/sync/simkl`)
   - `migrations/` — migracje bazy danych Alembic
   - `scripts/poc_taste_engine.py` — samodzielny skrypt badawczy PoC
   - `scripts/get_simkl_token.py` — asystent autoryzacji OAuth 2.0 Simkl Device Flow
-  - `tests/` — testy jednostkowe i integracyjne (konfiguracja, baza, migracje, healthcheck)
+  - `tests/` — testy jednostkowe i integracyjne (32 testy)
   - `data/` — lokalna baza SQLite i pliki wyjściowe
 
 ## Najbliższy Krok (Next Action)
 
-> Zrealizować Etap 1 (Simkl): klient API Simkl, pobieranie historii, ocen i listy Plan to Watch, przyrostowa synchronizacja do SQLite oraz idempotentny zapis zaakceptowanych pozycji.
+> Zrealizować Etap 2 (Profil gustu): serwis analizy historii i preferencji, generowanie i wersjonowanie profilu JSON (wagi, confidence) oraz mechanizm ręcznej korekty profilu.
 
 ## Blokady (Blockers)
 
-Brak. Fundament aplikacji gotowy i w pełni przetestowany.
+Brak. Integracja z Simkl oraz synchronizacja danych biblioteki w pełni zaimplementowana i przetestowana.
 
 ## Backlog Zadań
 
@@ -90,10 +99,10 @@ Brak. Fundament aplikacji gotowy i w pełni przetestowany.
 - [x] Konfiguracja testów `pytest` i reguł `ruff`
 
 ### Etap 1: Simkl
-- [ ] Klient API Simkl i obsługa uwierzytelniania
-- [ ] Pobieranie historii, ocen i listy Plan to Watch
-- [ ] Przyrostowa synchronizacja do SQLite
-- [ ] Idempotentny zapis zaakceptowanych pozycji z testami
+- [x] Klient API Simkl i obsługa uwierzytelniania
+- [x] Pobieranie historii, ocen i listy Plan to Watch
+- [x] Przyrostowa synchronizacja do SQLite
+- [x] Idempotentny zapis zaakceptowanych pozycji z testami
 
 ### Etap 2: Profil gustu
 - [ ] Serwis analizy historii i preferencji
@@ -147,3 +156,13 @@ Brak. Fundament aplikacji gotowy i w pełni przetestowany.
   4. Zaimplementowano globalne mapowanie błędów na kody z `API_CONTRACTS.md` oraz middleware korelacji `X-Request-ID`.
   5. Pokryto fundament 16 testami automatycznymi (`pytest`) oraz skonfigurowano sprawdzanie reguł jakości kodu `ruff`.
 - **Uzasadnienie**: Zapewnienie stabilnej, skalowalnej i przetestowanej bazy architektonicznej dla integracji z Simkl (Etap 1).
+
+### 2026-11-14 — Wdrożenie Etapu 1 (Simkl Integration & Sync)
+- **Decyzja / Zmiana**:
+  1. Zaimplementowano asynchroniczny klient `SimklClient` (`app/integrations/simkl.py`) z obsługą nagłówków API, throttlingiem (10 GET/s, 1 POST/s) i retry z wykładniczym backoffem.
+  2. Zapewniono obsługę obu wariantów zmiennej tokenu (`SIMKL_USER_TOKEN` oraz `SIMKL_ACCESS_TOKEN`) w `Settings.effective_simkl_token`.
+  3. Zaimplementowano `SyncService` (`app/services/sync.py`) obsługujący zarówno synchronizację pełną, jak i przyrostową (`sync_state.last_success_at` -> parametr `date_from`), mapowanie i upsert do `media_items` i `watch_history` oraz zarządzanie transakcjami.
+  4. Zaimplementowano `WatchlistService` (`app/services/watchlist.py`) ze ścisłą egzekucją reguły bezpieczeństwa (brak zapisu bez jawnej akceptacji `status == 'accepted'`) oraz pełną idempotencją zapisu do Simkl (`POST /sync/add-to-list`).
+  5. Dodano endpointy REST API: `POST /api/sync/simkl` oraz `GET /api/sync/simkl/status` z wstrzykiwaniem zależności `Annotated[Session, Depends(get_db)]`.
+  6. Dodano zestaw testów automatycznych (łącznie 32 testy przechodzące w 100%), mockujący transport HTTP bez zewnętrznych bibliotek (wbudowany `httpx.MockTransport`).
+- **Uzasadnienie**: Spełnienie kryteriów akceptacji Etapu 1 z ROADMAP.md: rzeczywiste dane są poprawnie pobierane i zapisywane lokalnie, a zapis do Simkl jest kontrolowany i idempotentny.

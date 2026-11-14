@@ -23,13 +23,13 @@ przechodzą. (Ukończono pomyślnie)
 
 ## Etap 1 -- Simkl
 
--   [ ] Rejestracja aplikacji i OAuth zgodny z aktualną dokumentacją.
--   [ ] Odczyt historii, ocen i Plan to Watch.
--   [ ] Lokalna synchronizacja przyrostowa.
--   [ ] Test zapisu pojedynczej zaakceptowanej pozycji.
+-   [x] Rejestracja aplikacji i OAuth zgodny z aktualną dokumentacją.
+-   [x] Odczyt historii, ocen i Plan to Watch.
+-   [x] Lokalna synchronizacja przyrostowa.
+-   [x] Test zapisu pojedynczej zaakceptowanej pozycji.
 
 **Akceptacja:** rzeczywiste dane są poprawnie zapisane lokalnie; zapis
-do Simkl jest kontrolowany i idempotentny.
+do Simkl jest kontrolowany i idempotentny. (Ukończono pomyślnie)
 
 ## Etap 2 -- profil gustu
 

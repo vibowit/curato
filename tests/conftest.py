@@ -3,16 +3,21 @@ from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, event
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import sessionmaker
+from sqlalchemy.pool import StaticPool
 
 from app.core.database import get_db
 from app.main import create_app
-from app.models.base import Base
+from app.models import Base
 
 
 @pytest.fixture
 def in_memory_db():
     """In-memory SQLite database session fixture."""
-    engine = create_engine("sqlite:///:memory:", connect_args={"check_same_thread": False})
+    engine = create_engine(
+        "sqlite:///:memory:",
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
+    )
 
     @event.listens_for(Engine, "connect")
     def set_sqlite_pragma(dbapi_connection, connection_record):
@@ -28,6 +33,12 @@ def in_memory_db():
     finally:
         session.close()
         Base.metadata.drop_all(bind=engine)
+
+
+@pytest.fixture
+def db_session(in_memory_db):
+    """Alias fixture for in_memory_db."""
+    return in_memory_db
 
 
 @pytest.fixture
