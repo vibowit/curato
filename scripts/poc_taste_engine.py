@@ -97,8 +97,37 @@ class SimklDataExtractor:
 
     def __init__(self, raw_data: Dict[str, Any]):
         self.raw_data = raw_data
-        self.raw_movies = raw_data.get("movies", [])
-        self.raw_shows = raw_data.get("shows", [])
+
+        raw_m = raw_data.get("movies", [])
+        if isinstance(raw_m, dict):
+            raw_m = raw_m.get("movies", [])
+        self.raw_movies = [self._normalize_item(m) for m in (raw_m or []) if isinstance(m, dict)]
+
+        raw_s = raw_data.get("shows", [])
+        if isinstance(raw_s, dict):
+            raw_s = raw_s.get("shows", [])
+        self.raw_shows = [self._normalize_item(s) for s in (raw_s or []) if isinstance(s, dict)]
+
+    @staticmethod
+    def _normalize_item(raw_item: Dict[str, Any]) -> Dict[str, Any]:
+        """Normalizes both flat fixture format and nested Simkl API format (item['movie'] / item['show'])."""
+        media = raw_item.get("movie") or raw_item.get("show") or raw_item.get("anime") or {}
+
+        title = raw_item.get("title") or media.get("title") or ""
+        year = raw_item.get("year") or media.get("year")
+        ids = raw_item.get("ids") or media.get("ids") or {}
+        status = str(raw_item.get("status", "")).lower()
+        user_rating = raw_item.get("user_rating")
+        last_watched_at = raw_item.get("last_watched_at")
+
+        return {
+            "title": title,
+            "year": year,
+            "ids": ids,
+            "status": status,
+            "user_rating": user_rating,
+            "last_watched_at": last_watched_at,
+        }
 
     def get_movies(self) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
         """Returns (watched_movies, plan_to_watch_movies)."""
@@ -106,7 +135,7 @@ class SimklDataExtractor:
         ptw = []
         for item in self.raw_movies:
             status = str(item.get("status", "")).lower()
-            if status == "plantowatch":
+            if status in ("plantowatch", "plan to watch"):
                 ptw.append(item)
             else:
                 watched.append(item)
@@ -118,7 +147,7 @@ class SimklDataExtractor:
         ptw = []
         for item in self.raw_shows:
             status = str(item.get("status", "")).lower()
-            if status == "plantowatch":
+            if status in ("plantowatch", "plan to watch"):
                 ptw.append(item)
             else:
                 watched.append(item)
@@ -231,10 +260,13 @@ class SimklApiClient:
         movies_url = f"{self.BASE_URL}/sync/all-items/movies"
         shows_url = f"{self.BASE_URL}/sync/all-items/shows"
 
-        movies = self._get(movies_url, headers)
-        shows = self._get(shows_url, headers)
+        movies_resp = self._get(movies_url, headers)
+        shows_resp = self._get(shows_url, headers)
 
-        return {"movies": movies, "shows": shows}
+        movies_list = movies_resp.get("movies", []) if isinstance(movies_resp, dict) else (movies_resp or [])
+        shows_list = shows_resp.get("shows", []) if isinstance(shows_resp, dict) else (shows_resp or [])
+
+        return {"movies": movies_list, "shows": shows_list}
 
     def _get(self, url: str, headers: Dict[str, str]) -> Any:
         req = urllib.request.Request(url, headers=headers, method="GET")
@@ -503,6 +535,12 @@ class TasteEnginePoC:
         """Generates the taste profile from high-rated and low-rated history."""
         high_rated = extractor.get_high_rated(min_rating=8)
         low_rated = extractor.get_low_rated(max_rating=4)
+
+        # Fallback: if user has no explicitly rated 8-10 items, take all watched items as positive signals
+        if not high_rated:
+            watched_movies, _ = extractor.get_movies()
+            watched_shows, _ = extractor.get_shows()
+            high_rated = (watched_movies + watched_shows)[:20]
 
         if not self.offline_mode and self.gemini_provider.api_key:
             prompt = self._create_profile_prompt(high_rated, low_rated)

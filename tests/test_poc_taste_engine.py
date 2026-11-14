@@ -58,6 +58,61 @@ class TestPocTasteEngine(unittest.TestCase):
         self.assertIn("Fast X", low_titles)
         self.assertIn("Madame Web", low_titles)
 
+    def test_simkl_nested_api_format_extraction(self):
+        """Test extraction when Simkl API returns nested objects under 'movie' or 'show'."""
+        nested_data = {
+            "movies": [
+                {
+                    "status": "completed",
+                    "user_rating": 9,
+                    "last_watched_at": "2024-01-01T00:00:00Z",
+                    "movie": {
+                        "title": "Inception",
+                        "year": 2010,
+                        "ids": {"simkl": 1234, "imdb": "tt1375666", "tmdb": "27205"},
+                    },
+                },
+                {
+                    "status": "plantowatch",
+                    "user_rating": None,
+                    "movie": {
+                        "title": "Oppenheimer",
+                        "year": 2023,
+                        "ids": {"simkl": 5678, "imdb": "tt15398776", "tmdb": "872585"},
+                    },
+                },
+            ],
+            "shows": [
+                {
+                    "status": "completed",
+                    "user_rating": 10,
+                    "show": {
+                        "title": "Breaking Bad",
+                        "year": 2008,
+                        "ids": {"simkl": 9999, "imdb": "tt0903747", "tmdb": "1396"},
+                    },
+                }
+            ],
+        }
+
+        extractor = SimklDataExtractor(nested_data)
+        watched_m, ptw_m = extractor.get_movies()
+        watched_s, ptw_s = extractor.get_shows()
+
+        self.assertEqual(len(watched_m), 1)
+        self.assertEqual(watched_m[0]["title"], "Inception")
+        self.assertEqual(watched_m[0]["year"], 2010)
+        self.assertEqual(len(ptw_m), 1)
+        self.assertEqual(ptw_m[0]["title"], "Oppenheimer")
+        self.assertEqual(len(watched_s), 1)
+        self.assertEqual(watched_s[0]["title"], "Breaking Bad")
+
+        high_rated = extractor.get_high_rated(min_rating=8)
+        self.assertEqual(len(high_rated), 2)
+        titles = [item["title"] for item in high_rated]
+        self.assertIn("Inception", titles)
+        self.assertIn("Breaking Bad", titles)
+
     def test_anti_recommendation_filter(self):
         """Test that watched and plan-to-watch items are strictly rejected."""
         anti_filter = AntiRecommendationFilter(self.extractor.get_all_known_titles_and_ids())
