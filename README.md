@@ -10,6 +10,18 @@ Recommendations can be reviewed through a lightweight single-page web dashboard 
 
 ---
 
+## Why Curato?
+
+Ever sat down in front of the TV after a long week, excited to watch something good, only to find yourself completely paralyzed by choice?
+
+- **Oscar-winning lists?** A great way to get emotionally drained when all you wanted was an engaging evening.
+- **Top 250 on IMDb?** Quickly reveals that the "arithmetic average of the crowd" rarely matches your personal taste.
+- **Streaming homepages?** End up in 40 minutes of mindless scrolling through algorithms optimized to push whatever is trending, rather than what you actually enjoy.
+
+Most movie pickers treat recommendations as a generic popularity contest. **Curato** was built to solve this personal frustration: it turns your actual watch history into a private taste profile, filters out everything you've already seen or disliked, and uses LLMs to surface a tight, tailored shortlist of titles you actually want to watch — with zero algorithmic bloat.
+
+---
+
 ## Architecture and Design Principles
 
 - **Taste profiling with provenance**: Watch history and ratings are aggregated from Simkl into versioned taste profiles (e.g., `v1.0-gemini`). Profiles capture thematic motifs, directorial preferences, and anti-preferences, while supporting manual adjustments (`v1.1-manual`) without losing provenance data.
