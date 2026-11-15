@@ -13,7 +13,11 @@ document.addEventListener("DOMContentLoaded", () => {
   };
 
   // DOM Elements
-  const profilePill = document.getElementById("profile-pill");
+  const profilePillText = document.getElementById("profile-pill-text");
+  const btnProfile = document.getElementById("btn-profile");
+  const modalProfile = document.getElementById("modal-profile");
+  const profileContentContainer = document.getElementById("profile-content-container");
+  const btnGenerateProfile = document.getElementById("btn-generate-profile");
   const runSelect = document.getElementById("run-select");
   const runMetaStatus = document.getElementById("run-meta-status");
   const summaryMeta = document.getElementById("summary-meta");
@@ -79,10 +83,14 @@ document.addEventListener("DOMContentLoaded", () => {
     try {
       const data = await api("/api/profile");
       state.activeProfile = data;
-      profilePill.textContent = `Profil: ${data.version}`;
-      profilePill.title = `Profil aktywny: ${data.version}`;
+      if (profilePillText) {
+        profilePillText.textContent = `Profil: ${data.version}`;
+      }
     } catch (err) {
-      profilePill.textContent = "Profil: brak";
+      state.activeProfile = null;
+      if (profilePillText) {
+        profilePillText.textContent = "Profil: brak";
+      }
     }
   }
 
@@ -373,6 +381,107 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
+  // Open Taste Profile Modal
+  async function openProfileModal() {
+    modalProfile.classList.remove("hidden");
+    profileContentContainer.innerHTML = '<p class="loading-text">Ładowanie profilu gustu...</p>';
+
+    try {
+      const profile = await api("/api/profile");
+      state.activeProfile = profile;
+      if (profilePillText) profilePillText.textContent = `Profil: ${profile.version}`;
+
+      const content = profile.content || {};
+      const genres = content.genres || [];
+      const themes = content.themes || [];
+      const directors = content.directors_or_creators || [];
+      const anti = content.anti_preferences || [];
+      const temp = content.temporary_interests || [];
+      const createdDate = new Date(profile.created_at).toLocaleString("pl-PL");
+
+      profileContentContainer.innerHTML = `
+        <div style="margin-bottom: 1rem; padding: 0.75rem 1rem; background: var(--bg-primary); border-radius: var(--radius-sm); border: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem;">
+          <div>
+            <strong>Wersja profilu:</strong> <span class="badge badge-profile">${profile.version}</span>
+            <span style="color: var(--text-muted); font-size: 0.85rem; margin-left: 0.5rem;">(Utworzono: ${createdDate})</span>
+          </div>
+          <div style="font-size: 0.85rem; color: var(--color-success);">● Aktywny</div>
+        </div>
+
+        <div class="profile-section-title">Podsumowanie gustu</div>
+        <p style="color: var(--text-main); font-size: 0.95rem; line-height: 1.6; background: var(--bg-primary); padding: 0.85rem; border-radius: var(--radius-sm); border: 1px solid var(--border-color);">
+          ${content.summary || "Brak podsumowania."}
+        </p>
+
+        <div class="profile-section-title">Ulubione gatunki</div>
+        <div class="profile-tags-grid">
+          ${genres.map(g => `<span class="profile-tag"><strong>${g.name}</strong> <span class="profile-tag-weight">${Math.round(g.weight * 100)}%</span></span>`).join("")}
+        </div>
+
+        <div class="profile-section-title">Kluczowe motywy</div>
+        <div class="profile-tags-grid">
+          ${themes.map(t => `<span class="profile-tag">🎯 ${t.name} <span class="profile-tag-weight">${Math.round(t.weight * 100)}%</span></span>`).join("")}
+        </div>
+
+        <div class="profile-section-title">Preferowani twórcy i reżyserzy</div>
+        <div class="profile-tags-grid">
+          ${directors.map(d => `<span class="profile-tag">🎬 ${d}</span>`).join("")}
+        </div>
+
+        ${anti.length > 0 ? `
+          <div class="profile-section-title" style="color: var(--color-danger);">⛔ Antypreferencje (wykluczenia)</div>
+          <div class="profile-tags-grid">
+            ${anti.map(a => `<span class="profile-tag" style="border-color: rgba(239, 68, 68, 0.4); color: #fca5a5;">✕ ${a}</span>`).join("")}
+          </div>
+        ` : ""}
+
+        ${temp.length > 0 ? `
+          <div class="profile-section-title" style="color: var(--color-warning);">⏳ Chwilowe zainteresowania</div>
+          <div class="profile-tags-grid">
+            ${temp.map(ti => `<span class="profile-tag">✨ ${ti.name}</span>`).join("")}
+          </div>
+        ` : ""}
+      `;
+
+      btnGenerateProfile.textContent = "🔄 Przelicz profil na nowo (Gemini)";
+    } catch (err) {
+      state.activeProfile = null;
+      if (profilePillText) profilePillText.textContent = "Profil: brak";
+
+      profileContentContainer.innerHTML = `
+        <div class="empty-state" style="padding: 2rem 1rem;">
+          <span style="font-size: 3rem;">🧠</span>
+          <h3 style="margin: 0.75rem 0 0.5rem;">Brak wygenerowanego profilu gustu</h3>
+          <p style="color: var(--text-muted); max-width: 500px; margin: 0 auto 1.5rem;">
+            Aby generować trafne rekomendacje, system potrzebuje profilu gustu opartego na Twojej bibliotece Simkl.
+            Kliknij przycisk poniżej, aby model Gemini przeanalizował obejrzane pozycje i stworzył Twój profil.
+          </p>
+        </div>
+      `;
+      btnGenerateProfile.textContent = "⚡ Wygeneruj profil gustu (Gemini)";
+    }
+  }
+
+  // Generate Profile Handler
+  async function handleGenerateProfile() {
+    btnGenerateProfile.disabled = true;
+    const origText = btnGenerateProfile.textContent;
+    btnGenerateProfile.textContent = "⏳ Analiza historii Simkl przez Gemini (ok. 15s)...";
+
+    try {
+      const newProfile = await api("/api/profile/generate", { method: "POST" });
+      state.activeProfile = newProfile;
+      if (profilePillText) profilePillText.textContent = `Profil: ${newProfile.version}`;
+      showToast(`Pomyślnie wygenerowano profil gustu ${newProfile.version}!`, "success");
+      await openProfileModal();
+    } catch (err) {
+      showToast(`Błąd generowania profilu: ${err.message}`, "error");
+    } finally {
+      btnGenerateProfile.disabled = false;
+      btnGenerateProfile.textContent = origText;
+    }
+  }
+
   // Open Decision History Modal
   async function openHistoryModal() {
     modalHistory.classList.remove("hidden");
@@ -580,6 +689,14 @@ document.addEventListener("DOMContentLoaded", () => {
 
   formNewRun.addEventListener("submit", async (e) => {
     e.preventDefault();
+
+    if (!state.activeProfile) {
+      modalNewRun.classList.add("hidden");
+      showToast("Przed utworzeniem rekomendacji należy wygenerować profil gustu.", "warning");
+      openProfileModal();
+      return;
+    }
+
     const movieLimit = Number(document.getElementById("input-movie-limit").value) || 10;
     const showLimit = Number(document.getElementById("input-show-limit").value) || 5;
     const excludeAnim = document.getElementById("input-exclude-animation").checked;
@@ -611,6 +728,10 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 
+  // Profile Modal Listeners
+  if (btnProfile) btnProfile.addEventListener("click", openProfileModal);
+  if (btnGenerateProfile) btnGenerateProfile.addEventListener("click", handleGenerateProfile);
+
   // History Modal
   btnHistory.addEventListener("click", openHistoryModal);
 
@@ -619,6 +740,7 @@ document.addEventListener("DOMContentLoaded", () => {
     btn.addEventListener("click", () => {
       modalNewRun.classList.add("hidden");
       modalHistory.classList.add("hidden");
+      if (modalProfile) modalProfile.classList.add("hidden");
     });
   });
 
@@ -630,6 +752,7 @@ document.addEventListener("DOMContentLoaded", () => {
   window.addEventListener("click", (e) => {
     if (e.target === modalNewRun) modalNewRun.classList.add("hidden");
     if (e.target === modalHistory) modalHistory.classList.add("hidden");
+    if (e.target === modalProfile) modalProfile.classList.add("hidden");
     if (e.target === modalTrailer) closeTrailerModal();
   });
 

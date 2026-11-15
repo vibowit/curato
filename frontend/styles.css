@@ -160,6 +160,46 @@ body {
   background-color: rgba(139, 92, 246, 0.2);
   color: #c4b5fd;
   border: 1px solid rgba(139, 92, 246, 0.4);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-family: inherit;
+}
+
+.badge-profile:hover {
+  background-color: rgba(139, 92, 246, 0.35);
+  border-color: rgba(139, 92, 246, 0.7);
+  transform: translateY(-1px);
+}
+
+.profile-section-title {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--text-main);
+  margin-top: 1.25rem;
+  margin-bottom: 0.5rem;
+}
+
+.profile-tags-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.profile-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  background-color: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  padding: 0.35rem 0.65rem;
+  font-size: 0.85rem;
+}
+
+.profile-tag-weight {
+  font-size: 0.75rem;
+  color: var(--color-purple);
+  font-weight: 600;
 }
 
 .badge-movie {

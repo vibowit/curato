@@ -21,7 +21,9 @@
         </div>
       </div>
       <div class="header-actions">
-        <div id="profile-pill" class="badge badge-profile">Profil: Ładowanie...</div>
+        <button id="btn-profile" class="badge badge-profile" style="cursor: pointer;" title="Kliknij, aby zobaczyć lub wygenerować profil gustu">
+          🧠 <span id="profile-pill-text">Profil: Ładowanie...</span>
+        </button>
         <button id="btn-sync" class="btn btn-secondary">
           <span class="icon">🔄</span> Sync Simkl
         </button>
@@ -126,6 +128,27 @@
           <button type="submit" id="btn-submit-run" class="btn btn-primary">Uruchom generowanie</button>
         </div>
       </form>
+    </div>
+  </div>
+
+  <!-- Modal: Profil Gustu -->
+  <div id="modal-profile" class="modal-overlay hidden">
+    <div class="modal-dialog modal-lg">
+      <div class="modal-header">
+        <h3>🧠 Profil Gustu Użytkownika</h3>
+        <button class="modal-close" data-close-modal>&times;</button>
+      </div>
+      <div class="modal-body">
+        <div id="profile-content-container">
+          <p class="loading-text">Ładowanie profilu gustu...</p>
+        </div>
+      </div>
+      <div class="modal-footer" style="display: flex; justify-content: space-between; align-items: center;">
+        <button type="button" id="btn-generate-profile" class="btn btn-primary">
+          ⚡ Wygeneruj profil (Gemini)
+        </button>
+        <button type="button" class="btn btn-secondary" data-close-modal>Zamknij</button>
+      </div>
     </div>
   </div>
 
