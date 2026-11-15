@@ -20,6 +20,8 @@ class CandidateItem(BaseModel):
     popularity: float = 0.0
     poster_path: Optional[str] = None
     imdb_id: Optional[str] = None
+    trailer_key: Optional[str] = None
+    trailer_url: Optional[str] = None
     source_strategy: str = Field(
         ..., description="e.g. 'similar_to_favorites', 'profile_genres', 'director', 'exploration'"
     )
@@ -78,6 +80,8 @@ class MediaItemSummary(BaseModel):
     imdb_id: Optional[str] = None
     metadata_json: Optional[str] = None
     poster_path: Optional[str] = None
+    trailer_key: Optional[str] = None
+    trailer_url: Optional[str] = None
 
     model_config = {"from_attributes": True}
 
@@ -96,6 +100,8 @@ class RecommendationRead(BaseModel):
     status: str
     latest_decision: Optional[str] = None
     created_at: datetime
+    trailer_key: Optional[str] = None
+    trailer_url: Optional[str] = None
     media_item: Optional[MediaItemSummary] = None
 
     model_config = {"from_attributes": True}
@@ -130,3 +136,14 @@ class RecommendationRunSummary(BaseModel):
     recommendations_count: int = 0
 
     model_config = {"from_attributes": True}
+
+
+class TrailerResponse(BaseModel):
+    """Response containing trailer information and YouTube fallback search link."""
+
+    recommendation_id: int
+    title: str
+    year: Optional[int] = None
+    trailer_key: Optional[str] = None
+    trailer_url: Optional[str] = None
+    fallback_search_url: str

@@ -1,8 +1,10 @@
+import asyncio
 import json
 import logging
 import re
+import urllib.parse
 from datetime import datetime, timedelta, timezone
-from typing import Dict, List, Optional, Set, Tuple
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 from sqlalchemy import desc, select
 from sqlalchemy.orm import Session
@@ -26,6 +28,7 @@ from app.schemas.recommendation import (
     RecommendationRead,
     RecommendationRunCreateRequest,
     RecommendationRunRead,
+    TrailerResponse,
 )
 from app.schemas.taste import TasteProfileContent
 from app.services.discovery import DiscoveryService
@@ -506,6 +509,29 @@ class RecommendationService:
             )
             final_selection = final_movies + final_shows
 
+            # Fetch trailers for final selection concurrently
+            sem_trailers = asyncio.Semaphore(5)
+
+            async def hydrate_trailer(cand: CandidateItem) -> None:
+                if not cand.tmdb_id:
+                    return
+                async with sem_trailers:
+                    try:
+                        if cand.media_type == "movie":
+                            vid_res = await self.discovery.tmdb.get_movie_videos(cand.tmdb_id)
+                        else:
+                            vid_res = await self.discovery.tmdb.get_show_videos(cand.tmdb_id)
+                        best = self.discovery.tmdb.extract_best_trailer(vid_res)
+                        if best:
+                            cand.trailer_key = best["trailer_key"]
+                            cand.trailer_url = best["trailer_url"]
+                    except Exception as e:
+                        logger.debug(
+                            "Failed fetching trailer for %s (%d): %s", cand.title, cand.tmdb_id, e
+                        )
+
+            await asyncio.gather(*(hydrate_trailer(cand) for cand, _ in final_selection))
+
             # 8. Save/Upsert MediaItems and Recommendations in SQLite
             for cand, ev in final_selection:
                 # Find or create MediaItem
@@ -531,12 +557,27 @@ class RecommendationService:
                                 "poster_path": cand.poster_path,
                                 "vote_average": cand.vote_average,
                                 "vote_count": cand.vote_count,
+                                "trailer_key": cand.trailer_key,
+                                "trailer_url": cand.trailer_url,
                             },
                             ensure_ascii=False,
                         ),
                     )
                     db.add(media_item)
                     db.flush()
+                else:
+                    # Update metadata_json if trailer is newly discovered
+                    if cand.trailer_key:
+                        meta = {}
+                        if media_item.metadata_json:
+                            try:
+                                meta = json.loads(media_item.metadata_json)
+                            except Exception:
+                                meta = {}
+                        if not meta.get("trailer_key"):
+                            meta["trailer_key"] = cand.trailer_key
+                            meta["trailer_url"] = cand.trailer_url
+                            media_item.metadata_json = json.dumps(meta, ensure_ascii=False)
 
                 # Add Recommendation
                 recommendation = Recommendation(
@@ -620,12 +661,16 @@ class RecommendationService:
                     pass
 
             media_summary = None
+            trailer_key = None
+            trailer_url = None
             if rec.media_item:
                 poster_path = None
                 if rec.media_item.metadata_json:
                     try:
                         meta = json.loads(rec.media_item.metadata_json)
                         poster_path = meta.get("poster_path")
+                        trailer_key = meta.get("trailer_key")
+                        trailer_url = meta.get("trailer_url")
                     except Exception:
                         pass
                 media_summary = MediaItemSummary(
@@ -638,6 +683,8 @@ class RecommendationService:
                     imdb_id=rec.media_item.imdb_id,
                     metadata_json=rec.media_item.metadata_json,
                     poster_path=poster_path,
+                    trailer_key=trailer_key,
+                    trailer_url=trailer_url,
                 )
 
             latest_decision = None
@@ -657,6 +704,8 @@ class RecommendationService:
                     status=rec.status,
                     latest_decision=latest_decision,
                     created_at=rec.created_at,
+                    trailer_key=trailer_key,
+                    trailer_url=trailer_url,
                     media_item=media_summary,
                 )
             )
@@ -671,4 +720,89 @@ class RecommendationService:
             summary=run.summary,
             parameters=parameters,
             recommendations=recommendations_read,
+        )
+
+    async def get_or_fetch_trailer(self, db: Session, recommendation_id: int) -> TrailerResponse:
+        """Retrieves or dynamically fetches the YouTube trailer for a recommendation."""
+        rec = db.execute(
+            select(Recommendation).where(Recommendation.id == recommendation_id)
+        ).scalar_one_or_none()
+        if not rec:
+            raise NotFoundException(f"Recommendation #{recommendation_id} not found.")
+
+        media_item = rec.media_item
+        title = media_item.title if media_item else "Unknown"
+        year = media_item.year if media_item else None
+
+        # Build YouTube search query fallback
+        search_query = f"{title} {year or ''} official trailer".strip()
+        fallback_url = (
+            f"https://www.youtube.com/results?search_query={urllib.parse.quote_plus(search_query)}"
+        )
+
+        if not media_item:
+            return TrailerResponse(
+                recommendation_id=rec.id,
+                title=title,
+                year=year,
+                trailer_key=None,
+                trailer_url=None,
+                fallback_search_url=fallback_url,
+            )
+
+        # Check existing metadata
+        metadata: Dict[str, Any] = {}
+        if media_item.metadata_json:
+            try:
+                metadata = json.loads(media_item.metadata_json)
+            except Exception:
+                metadata = {}
+
+        if metadata.get("trailer_key"):
+            return TrailerResponse(
+                recommendation_id=rec.id,
+                title=title,
+                year=year,
+                trailer_key=metadata.get("trailer_key"),
+                trailer_url=metadata.get("trailer_url"),
+                fallback_search_url=fallback_url,
+            )
+
+        # Not present in metadata, fetch from TMDB if tmdb_id is available
+        if media_item.tmdb_id:
+            try:
+                if media_item.media_type == "movie":
+                    vid_res = await self.discovery.tmdb.get_movie_videos(media_item.tmdb_id)
+                else:
+                    vid_res = await self.discovery.tmdb.get_show_videos(media_item.tmdb_id)
+                best = self.discovery.tmdb.extract_best_trailer(vid_res)
+                if best:
+                    metadata["trailer_key"] = best["trailer_key"]
+                    metadata["trailer_url"] = best["trailer_url"]
+                    media_item.metadata_json = json.dumps(metadata, ensure_ascii=False)
+                    db.commit()
+                    db.refresh(media_item)
+                    return TrailerResponse(
+                        recommendation_id=rec.id,
+                        title=title,
+                        year=year,
+                        trailer_key=best["trailer_key"],
+                        trailer_url=best["trailer_url"],
+                        fallback_search_url=fallback_url,
+                    )
+            except Exception as e:
+                logger.warning(
+                    "Failed on-demand trailer fetch for recommendation %d (TMDB %d): %s",
+                    recommendation_id,
+                    media_item.tmdb_id,
+                    e,
+                )
+
+        return TrailerResponse(
+            recommendation_id=rec.id,
+            title=title,
+            year=year,
+            trailer_key=None,
+            trailer_url=None,
+            fallback_search_url=fallback_url,
         )

@@ -137,3 +137,54 @@ def test_get_recommendation_run_not_found(app_client: TestClient):
     res = app_client.get("/api/recommendation-runs/99999")
     assert res.status_code == 404
     assert res.json()["error_code"] == "NOT_FOUND"
+
+
+def test_get_recommendation_trailer_endpoint(app_client: TestClient, db_session: Session):
+    import json
+
+    from app.models.media import MediaItem
+    from app.models.recommendation import Recommendation, RecommendationRun
+
+    run = RecommendationRun(status="completed")
+    db_session.add(run)
+    db_session.flush()
+
+    media = MediaItem(
+        media_type="movie",
+        title="Dune",
+        year=2021,
+        tmdb_id=438631,
+        metadata_json=json.dumps(
+            {
+                "trailer_key": "n9xhJrPXop4",
+                "trailer_url": "https://www.youtube.com/watch?v=n9xhJrPXop4",
+            }
+        ),
+    )
+    db_session.add(media)
+    db_session.flush()
+
+    rec = Recommendation(
+        run_id=run.id,
+        media_item_id=media.id,
+        match_score=90.0,
+        confidence=0.85,
+        reason="Epic sci-fi",
+        status="pending",
+    )
+    db_session.add(rec)
+    db_session.commit()
+
+    # 1. Test existing trailer in metadata
+    res = app_client.get(f"/api/recommendations/{rec.id}/trailer")
+    assert res.status_code == 200
+    data = res.json()
+    assert data["recommendation_id"] == rec.id
+    assert data["title"] == "Dune"
+    assert data["trailer_key"] == "n9xhJrPXop4"
+    assert data["trailer_url"] == "https://www.youtube.com/watch?v=n9xhJrPXop4"
+    assert "youtube.com/results" in data["fallback_search_url"]
+
+    # 2. Test 404 for non-existent recommendation
+    res_404 = app_client.get("/api/recommendations/999999/trailer")
+    assert res_404.status_code == 404

@@ -13,7 +13,7 @@ from app.schemas.decision import (
     DecisionBatchResponse,
     UserDecisionRead,
 )
-from app.schemas.recommendation import RecommendationRunRead
+from app.schemas.recommendation import RecommendationRunRead, TrailerResponse
 from app.services.decisions import DecisionService
 from app.services.recommendations import RecommendationService
 from app.services.watchlist import WatchlistService
@@ -102,3 +102,17 @@ def get_latest_recommendation_run(
     if not run:
         raise NotFoundException("No recommendation runs found yet.")
     return rec_service.to_read_schema(run)
+
+
+@router.get(
+    "/{recommendation_id}/trailer",
+    response_model=TrailerResponse,
+    summary="Get or fetch trailer for recommendation",
+)
+async def get_recommendation_trailer(
+    recommendation_id: int,
+    db: Annotated[Session, Depends(get_db)],
+    rec_service: Annotated[RecommendationService, Depends(get_recommendation_service)],
+) -> TrailerResponse:
+    """Retrieves or dynamically fetches the YouTube trailer for a recommendation."""
+    return await rec_service.get_or_fetch_trailer(db=db, recommendation_id=recommendation_id)

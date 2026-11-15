@@ -28,8 +28,8 @@ mcp_server = MCPServer(
     name=settings.MCP_SERVER_NAME,
     instructions=(
         "Personal movie and TV show recommendation assistant powered by Simkl, "
-        "TMDB, and taste profiling. Allows browsing recommendations, recording decisions "
-        "(accept, reject, seen, later), and securely pushing approved items to Simkl."
+        "TMDB, and taste profiling. Allows browsing recommendations, watching trailers, "
+        "recording decisions (accept, reject, seen, later), and pushing approved items to Simkl."
     ),
     version=settings.VERSION,
 )
@@ -241,6 +241,8 @@ async def get_recommendations(run_id: Optional[int] = None) -> Dict[str, Any]:
                         "risks": r.risks,
                         "status": r.status,
                         "latest_decision": r.latest_decision,
+                        "trailer_url": r.trailer_url
+                        or (r.media_item.trailer_url if r.media_item else None),
                         "tmdb_id": r.media_item.tmdb_id if r.media_item else None,
                         "imdb_id": r.media_item.imdb_id if r.media_item else None,
                     }
@@ -256,6 +258,54 @@ async def get_recommendations(run_id: Optional[int] = None) -> Dict[str, Any]:
             }
     except Exception as e:
         logger.exception("Error in get_recommendations: %s", e)
+        return {"error": True, "message": str(e), "error_type": type(e).__name__}
+
+
+@mcp_server.tool()
+async def get_trailer(
+    recommendation_id: Optional[int] = None,
+    title: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Retrieves official YouTube trailer for a recommendation or movie/show title.
+
+    Parameters:
+    - recommendation_id: Optional recommendation ID (e.g. from get_recommendations)
+    - title: Optional title to search if recommendation_id is not known
+    """
+    try:
+        with SessionLocal() as db:
+            service = RecommendationService()
+            target_rec_id = recommendation_id
+
+            if target_rec_id is None and title:
+                query = title.strip().lower()
+                latest_run = service.get_latest_run(db)
+                if latest_run:
+                    for r in latest_run.recommendations:
+                        if r.media_item and query in r.media_item.title.lower():
+                            target_rec_id = r.id
+                            break
+
+            if target_rec_id is None:
+                return {
+                    "error": True,
+                    "message": (
+                        "Nie podano ID rekomendacji lub nie znaleziono propozycji po tytule."
+                    ),
+                }
+
+            trailer_data = await service.get_or_fetch_trailer(db, recommendation_id=target_rec_id)
+            return {
+                "success": True,
+                "recommendation_id": trailer_data.recommendation_id,
+                "title": trailer_data.title,
+                "year": trailer_data.year,
+                "has_official_trailer": trailer_data.trailer_url is not None,
+                "trailer_url": trailer_data.trailer_url,
+                "fallback_search_url": trailer_data.fallback_search_url,
+            }
+    except Exception as e:
+        logger.exception("Error in get_trailer: %s", e)
         return {"error": True, "message": str(e), "error_type": type(e).__name__}
 
 

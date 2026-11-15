@@ -367,3 +367,51 @@ class TMDBClient:
         return await self._request(
             "GET", f"/tv/{show_id}", params={"append_to_response": append_to_response}
         )
+
+    async def get_movie_videos(self, movie_id: int) -> Dict[str, Any]:
+        """Gets video clips and trailers for a movie."""
+        return await self._request("GET", f"/movie/{movie_id}/videos")
+
+    async def get_show_videos(self, show_id: int) -> Dict[str, Any]:
+        """Gets video clips and trailers for a TV show."""
+        return await self._request("GET", f"/tv/{show_id}/videos")
+
+    @staticmethod
+    def extract_best_trailer(videos_payload: Dict[str, Any]) -> Optional[Dict[str, str]]:
+        """Extracts the best matching YouTube trailer from TMDB videos payload.
+
+        Prioritizes:
+        1. Official YouTube Trailer
+        2. YouTube Trailer (non-official)
+        3. YouTube Teaser
+        4. Any YouTube Video
+        """
+        results = videos_payload.get("results") or []
+        yt_videos = [v for v in results if v.get("site") == "YouTube" and v.get("key")]
+        if not yt_videos:
+            return None
+
+        def trailer_score(v: Dict[str, Any]) -> int:
+            v_type = str(v.get("type", "")).lower()
+            official = bool(v.get("official", False))
+            score = 0
+            if v_type == "trailer":
+                score += 100
+                if official:
+                    score += 50
+            elif v_type == "teaser":
+                score += 50
+                if official:
+                    score += 20
+            elif v_type == "clip":
+                score += 10
+            return score
+
+        best_video = max(yt_videos, key=trailer_score)
+        key = best_video["key"]
+        return {
+            "trailer_key": key,
+            "trailer_url": f"https://www.youtube.com/watch?v={key}",
+            "name": best_video.get("name", "Trailer"),
+            "site": "YouTube",
+        }

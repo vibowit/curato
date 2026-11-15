@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from typing import Any, Dict, List, Optional, Set
 
@@ -119,8 +120,9 @@ class DiscoveryService:
         target_movies_pool: int = 60,
         target_shows_pool: int = 35,
     ) -> List[CandidateItem]:
-        """Harvests candidates across 4 distinct strategies to build a balanced pool."""
+        """Harvests candidates across 4 distinct strategies concurrently."""
         candidates_map: Dict[tuple[str, int], CandidateItem] = {}
+        sem = asyncio.Semaphore(5)
 
         # 1. Determine without_genres (e.g. animation)
         without_genres_set: Set[str] = set()
@@ -137,40 +139,45 @@ class DiscoveryService:
             str(TMDB_TV_GENRES[g]) for g in without_genres_set if g in TMDB_TV_GENRES
         )
 
+        tasks = []
+
         # 2. Strategy A: Similar to favorites (40%)
         fav_items = await self.get_favorites_from_db(db, limit=10)
-        for fav in fav_items:
+
+        async def fetch_fav_recommendations(fav: MediaItem) -> List[Optional[CandidateItem]]:
             if not fav.tmdb_id:
-                continue
-            try:
-                if fav.media_type == "movie":
-                    res = await self.tmdb.get_movie_recommendations(fav.tmdb_id)
-                    for item in res.get("results", [])[:8]:
-                        cand = self._normalize_movie(item, strategy="similar_to_favorites")
-                        if cand and (cand.media_type, cand.tmdb_id) not in candidates_map:
-                            candidates_map[(cand.media_type, cand.tmdb_id)] = cand
-                elif fav.media_type == "show":
-                    res = await self.tmdb.get_show_recommendations(fav.tmdb_id)
-                    for item in res.get("results", [])[:6]:
-                        cand = self._normalize_show(item, strategy="similar_to_favorites")
-                        if cand and (cand.media_type, cand.tmdb_id) not in candidates_map:
-                            candidates_map[(cand.media_type, cand.tmdb_id)] = cand
-            except TMDBAuthError:
-                raise
-            except Exception as e:
-                logger.debug(
-                    "Failed getting recommendations for %s (%d): %s", fav.title, fav.tmdb_id, e
-                )
+                return []
+            async with sem:
+                try:
+                    if fav.media_type == "movie":
+                        res = await self.tmdb.get_movie_recommendations(fav.tmdb_id)
+                        return [
+                            self._normalize_movie(item, strategy="similar_to_favorites")
+                            for item in res.get("results", [])[:8]
+                        ]
+                    elif fav.media_type == "show":
+                        res = await self.tmdb.get_show_recommendations(fav.tmdb_id)
+                        return [
+                            self._normalize_show(item, strategy="similar_to_favorites")
+                            for item in res.get("results", [])[:6]
+                        ]
+                except TMDBAuthError:
+                    raise
+                except Exception as e:
+                    logger.debug(
+                        "Failed getting recommendations for %s (%d): %s", fav.title, fav.tmdb_id, e
+                    )
+            return []
+
+        for fav in fav_items:
+            tasks.append(fetch_fav_recommendations(fav))
 
         # 3. Strategy B: Preferred genres from profile (35%)
-        # Take top 3 genres sorted by weight
         sorted_genres = sorted(profile.genres, key=lambda g: g.weight * g.confidence, reverse=True)
         top_genres = sorted_genres[:3]
 
-        for genre in top_genres:
-            g_name = genre.name.lower()
-            if g_name in TMDB_MOVIE_GENRES:
-                g_id = str(TMDB_MOVIE_GENRES[g_name])
+        async def fetch_genre_movies(g_name: str, g_id: str) -> List[Optional[CandidateItem]]:
+            async with sem:
                 try:
                     res_m = await self.tmdb.discover_movies(
                         with_genres=g_id,
@@ -178,17 +185,18 @@ class DiscoveryService:
                         vote_count_gte=100,
                         vote_average_gte=7.0,
                     )
-                    for item in res_m.get("results", [])[:10]:
-                        cand = self._normalize_movie(item, strategy="profile_genres")
-                        if cand and (cand.media_type, cand.tmdb_id) not in candidates_map:
-                            candidates_map[(cand.media_type, cand.tmdb_id)] = cand
+                    return [
+                        self._normalize_movie(item, strategy="profile_genres")
+                        for item in res_m.get("results", [])[:10]
+                    ]
                 except TMDBAuthError:
                     raise
                 except Exception as e:
                     logger.debug("Error discovering movies for genre %s: %s", g_name, e)
+            return []
 
-            if g_name in TMDB_TV_GENRES:
-                g_id = str(TMDB_TV_GENRES[g_name])
+        async def fetch_genre_shows(g_name: str, g_id: str) -> List[Optional[CandidateItem]]:
+            async with sem:
                 try:
                     res_s = await self.tmdb.discover_shows(
                         with_genres=g_id,
@@ -196,62 +204,96 @@ class DiscoveryService:
                         vote_count_gte=50,
                         vote_average_gte=7.0,
                     )
-                    for item in res_s.get("results", [])[:8]:
-                        cand = self._normalize_show(item, strategy="profile_genres")
-                        if cand and (cand.media_type, cand.tmdb_id) not in candidates_map:
-                            candidates_map[(cand.media_type, cand.tmdb_id)] = cand
+                    return [
+                        self._normalize_show(item, strategy="profile_genres")
+                        for item in res_s.get("results", [])[:8]
+                    ]
                 except TMDBAuthError:
                     raise
                 except Exception as e:
                     logger.debug("Error discovering shows for genre %s: %s", g_name, e)
+            return []
+
+        for genre in top_genres:
+            g_name = genre.name.lower()
+            if g_name in TMDB_MOVIE_GENRES:
+                tasks.append(fetch_genre_movies(g_name, str(TMDB_MOVIE_GENRES[g_name])))
+            if g_name in TMDB_TV_GENRES:
+                tasks.append(fetch_genre_shows(g_name, str(TMDB_TV_GENRES[g_name])))
 
         # 4. Strategy C: Favorite directors and creators (15%)
+        async def fetch_creator_movies(creator: str) -> List[Optional[CandidateItem]]:
+            async with sem:
+                try:
+                    person_res = await self.tmdb.search_person(creator)
+                    persons = person_res.get("results", [])
+                    if persons:
+                        person_id = persons[0]["id"]
+                        crew_res = await self.tmdb.discover_movies(
+                            with_crew=str(person_id),
+                            without_genres=movie_without_ids or None,
+                            vote_count_gte=30,
+                        )
+                        return [
+                            self._normalize_movie(item, strategy="director", director=creator)
+                            for item in crew_res.get("results", [])[:5]
+                        ]
+                except TMDBAuthError:
+                    raise
+                except Exception as e:
+                    logger.debug("Error searching creator %s: %s", creator, e)
+            return []
+
         for creator in profile.directors_or_creators[:4]:
-            try:
-                person_res = await self.tmdb.search_person(creator)
-                persons = person_res.get("results", [])
-                if persons:
-                    person_id = persons[0]["id"]
-                    crew_res = await self.tmdb.discover_movies(
-                        with_crew=str(person_id),
-                        without_genres=movie_without_ids or None,
-                        vote_count_gte=30,
-                    )
-                    for item in crew_res.get("results", [])[:5]:
-                        cand = self._normalize_movie(item, strategy="director", director=creator)
-                        if cand and (cand.media_type, cand.tmdb_id) not in candidates_map:
-                            candidates_map[(cand.media_type, cand.tmdb_id)] = cand
-            except TMDBAuthError:
-                raise
-            except Exception as e:
-                logger.debug("Error searching creator %s: %s", creator, e)
+            tasks.append(fetch_creator_movies(creator))
 
         # 5. Strategy D: Exploration (10%) - high quality items
-        try:
-            exp_m = await self.tmdb.discover_movies(
-                without_genres=movie_without_ids or None,
-                sort_by="vote_average.desc",
-                vote_count_gte=300,
-                vote_average_gte=7.8,
-            )
-            for item in exp_m.get("results", [])[:8]:
-                cand = self._normalize_movie(item, strategy="exploration")
-                if cand and (cand.media_type, cand.tmdb_id) not in candidates_map:
-                    candidates_map[(cand.media_type, cand.tmdb_id)] = cand
+        async def fetch_exploration_movies() -> List[Optional[CandidateItem]]:
+            async with sem:
+                try:
+                    exp_m = await self.tmdb.discover_movies(
+                        without_genres=movie_without_ids or None,
+                        sort_by="vote_average.desc",
+                        vote_count_gte=300,
+                        vote_average_gte=7.8,
+                    )
+                    return [
+                        self._normalize_movie(item, strategy="exploration")
+                        for item in exp_m.get("results", [])[:8]
+                    ]
+                except TMDBAuthError:
+                    raise
+                except Exception as e:
+                    logger.debug("Error during exploration movies discovery: %s", e)
+            return []
 
-            exp_s = await self.tmdb.discover_shows(
-                without_genres=show_without_ids or None,
-                sort_by="vote_average.desc",
-                vote_count_gte=150,
-                vote_average_gte=8.0,
-            )
-            for item in exp_s.get("results", [])[:6]:
-                cand = self._normalize_show(item, strategy="exploration")
+        async def fetch_exploration_shows() -> List[Optional[CandidateItem]]:
+            async with sem:
+                try:
+                    exp_s = await self.tmdb.discover_shows(
+                        without_genres=show_without_ids or None,
+                        sort_by="vote_average.desc",
+                        vote_count_gte=150,
+                        vote_average_gte=8.0,
+                    )
+                    return [
+                        self._normalize_show(item, strategy="exploration")
+                        for item in exp_s.get("results", [])[:6]
+                    ]
+                except TMDBAuthError:
+                    raise
+                except Exception as e:
+                    logger.debug("Error during exploration shows discovery: %s", e)
+            return []
+
+        tasks.append(fetch_exploration_movies())
+        tasks.append(fetch_exploration_shows())
+
+        # Execute all discovery tasks concurrently
+        results = await asyncio.gather(*tasks)
+        for batch in results:
+            for cand in batch:
                 if cand and (cand.media_type, cand.tmdb_id) not in candidates_map:
                     candidates_map[(cand.media_type, cand.tmdb_id)] = cand
-        except TMDBAuthError:
-            raise
-        except Exception as e:
-            logger.debug("Error during exploration discovery: %s", e)
 
         return list(candidates_map.values())

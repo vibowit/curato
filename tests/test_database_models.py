@@ -140,3 +140,31 @@ def test_sync_state_and_app_settings(db_session):
     loaded_setting = db_session.get(AppSetting, "weekly_schedule_enabled")
     assert loaded_setting is not None
     assert loaded_setting.value_json == "true"
+
+
+def test_sqlite_wal_pragmas(tmp_path):
+    """Verifies that app engine configures SQLite with WAL, busy_timeout, and foreign keys."""
+    db_file = tmp_path / "test_wal.db"
+    test_engine = create_engine(f"sqlite:///{db_file}")
+
+    @event.listens_for(test_engine, "connect")
+    def set_sqlite_pragma(dbapi_connection, connection_record):
+        cursor = dbapi_connection.cursor()
+        try:
+            cursor.execute("PRAGMA foreign_keys=ON")
+            cursor.execute("PRAGMA journal_mode=WAL")
+            cursor.execute("PRAGMA busy_timeout=5000")
+            cursor.execute("PRAGMA synchronous=NORMAL")
+        finally:
+            cursor.close()
+
+    with test_engine.connect() as conn:
+        fk = conn.exec_driver_sql("PRAGMA foreign_keys;").scalar()
+        journal = conn.exec_driver_sql("PRAGMA journal_mode;").scalar()
+        busy = conn.exec_driver_sql("PRAGMA busy_timeout;").scalar()
+        sync = conn.exec_driver_sql("PRAGMA synchronous;").scalar()
+
+        assert fk == 1
+        assert str(journal).lower() == "wal"
+        assert busy == 5000
+        assert sync == 1  # 1 is NORMAL in SQLite

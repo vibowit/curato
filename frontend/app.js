@@ -237,6 +237,9 @@ document.addEventListener("DOMContentLoaded", () => {
         </div>
         <div class="card-match-bar">
           <span class="match-score-badge">${matchPercent}% dopasowania</span>
+          <button class="btn-card-trailer" data-action="trailer" data-id="${rec.id}" title="Obejrzyj oficjalny zwiastun">
+            🎬 Zwiastun
+          </button>
           <span class="confidence-text">${confidenceText}</span>
         </div>
         <div class="card-reason">
@@ -448,6 +451,13 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // Card Action Buttons (Event Delegation)
   recsContainer.addEventListener("click", (e) => {
+    const trailerBtn = e.target.closest("[data-action='trailer']");
+    if (trailerBtn) {
+      const recId = Number(trailerBtn.dataset.id);
+      if (recId) openTrailerModal(recId);
+      return;
+    }
+
     const btn = e.target.closest(".action-btn");
     if (!btn) return;
     const recId = Number(btn.dataset.id);
@@ -456,6 +466,85 @@ document.addEventListener("DOMContentLoaded", () => {
       handleDecision(recId, action);
     }
   });
+
+  // Trailer Modal Handlers
+  const modalTrailer = document.getElementById("modal-trailer");
+  const modalTrailerTitle = document.getElementById("modal-trailer-title");
+  const trailerPlayerContainer = document.getElementById("trailer-player-container");
+  const trailerFallbackContainer = document.getElementById("trailer-fallback-container");
+  const trailerFallbackLink = document.getElementById("trailer-fallback-link");
+  const trailerDirectLink = document.getElementById("trailer-direct-link");
+
+  function closeTrailerModal() {
+    if (!modalTrailer) return;
+    modalTrailer.classList.add("hidden");
+    // Clear iframe to immediately stop playback and audio
+    trailerPlayerContainer.innerHTML = "";
+    trailerFallbackContainer.classList.add("hidden");
+    trailerPlayerContainer.classList.remove("hidden");
+  }
+
+  async function openTrailerModal(recId) {
+    const rec = state.recommendations.find((r) => r.id === recId);
+    const title = rec?.media_item?.title || "Zwiastun";
+    const year = rec?.media_item?.year ? `(${rec.media_item.year})` : "";
+    modalTrailerTitle.textContent = `${title} ${year} — Zwiastun`;
+
+    // Clear previous state and show modal with loading spinner
+    trailerPlayerContainer.innerHTML = `<div class="loading-state"><div class="spinner"></div><p>Ładowanie zwiastuna...</p></div>`;
+    trailerFallbackContainer.classList.add("hidden");
+    trailerPlayerContainer.classList.remove("hidden");
+    modalTrailer.classList.remove("hidden");
+
+    try {
+      let trailerKey = rec?.trailer_key || rec?.media_item?.trailer_key;
+      let trailerUrl = rec?.trailer_url || rec?.media_item?.trailer_url;
+      let fallbackUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(`${title} ${year} official trailer`)}`;
+
+      if (!trailerKey) {
+        // Fetch on-demand from API
+        const data = await api(`/api/recommendations/${recId}/trailer`);
+        trailerKey = data.trailer_key;
+        trailerUrl = data.trailer_url;
+        fallbackUrl = data.fallback_search_url || fallbackUrl;
+        if (rec && trailerKey) {
+          rec.trailer_key = trailerKey;
+          rec.trailer_url = trailerUrl;
+          if (rec.media_item) {
+            rec.media_item.trailer_key = trailerKey;
+            rec.media_item.trailer_url = trailerUrl;
+          }
+        }
+      }
+
+      if (trailerKey) {
+        trailerPlayerContainer.classList.remove("hidden");
+        trailerFallbackContainer.classList.add("hidden");
+        trailerPlayerContainer.innerHTML = `
+          <iframe
+            src="https://www.youtube-nocookie.com/embed/${trailerKey}?autoplay=1&rel=0"
+            title="${title} Trailer"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+            allowfullscreen>
+          </iframe>
+        `;
+        trailerDirectLink.href = trailerUrl || `https://www.youtube.com/watch?v=${trailerKey}`;
+        trailerDirectLink.classList.remove("hidden");
+      } else {
+        // Show fallback search link
+        trailerPlayerContainer.classList.add("hidden");
+        trailerFallbackContainer.classList.remove("hidden");
+        trailerFallbackLink.href = fallbackUrl;
+        trailerDirectLink.classList.add("hidden");
+      }
+    } catch (err) {
+      trailerPlayerContainer.classList.add("hidden");
+      trailerFallbackContainer.classList.remove("hidden");
+      trailerFallbackLink.href = `https://www.youtube.com/results?search_query=${encodeURIComponent(`${title} ${year} official trailer`)}`;
+      trailerDirectLink.classList.add("hidden");
+      showToast(`Nie udało się załadować zwiastuna: ${err.message}`, "error");
+    }
+  }
 
   // Submit Approval
   btnSubmitApprove.addEventListener("click", submitBulkApprove);
@@ -527,10 +616,22 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   });
 
+  document.querySelectorAll("[data-close-trailer]").forEach((btn) => {
+    btn.addEventListener("click", closeTrailerModal);
+  });
+
   // Close modal on click outside dialog
   window.addEventListener("click", (e) => {
     if (e.target === modalNewRun) modalNewRun.classList.add("hidden");
     if (e.target === modalHistory) modalHistory.classList.add("hidden");
+    if (e.target === modalTrailer) closeTrailerModal();
+  });
+
+  // Close trailer modal on Escape key
+  window.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && modalTrailer && !modalTrailer.classList.contains("hidden")) {
+      closeTrailerModal();
+    }
   });
 
   // Run app

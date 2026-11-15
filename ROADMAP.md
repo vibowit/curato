@@ -74,13 +74,14 @@ historii. (Ukończono pomyślnie)
 
 ## Etap 6 -- Zwiastuny i optymalizacja współbieżności
 
--   [ ] Rozszerzenie klienta TMDB o pobieranie wideo zwiastunów (`/movie/{id}/videos`, `/tv/{id}/videos`).
--   [ ] Dodanie pól `trailer_url` / `trailer_key` do schematów rekomendacji i metadanych `MediaItem`.
--   [ ] Interfejs UI: przycisk zwiastuna i modal z osadzonym odtwarzaczem YouTube (`youtube-nocookie`) bezpośrednio na karcie propozycji (oraz fallback do wyszukiwania).
--   [ ] Optymalizacja SQLite: włączenie trybu WAL (`PRAGMA journal_mode=WAL;`) oraz `PRAGMA busy_timeout=5000;` dla bezkolizyjnej pracy 24/7.
--   [ ] Zrównoleglenie pobierania kandydatów w TMDB Discovery (`asyncio.gather` z semaforem) w celu skrócenia czasu generowania rekomendacji.
+-   [x] Rozszerzenie klienta TMDB o pobieranie wideo zwiastunów (`/movie/{id}/videos`, `/tv/{id}/videos`).
+-   [x] Dodanie pól `trailer_url` / `trailer_key` do schematów rekomendacji i metadanych `MediaItem`.
+-   [x] Interfejs UI: przycisk zwiastuna i modal z osadzonym odtwarzaczem YouTube (`youtube-nocookie`) bezpośrednio na karcie propozycji (oraz fallback do wyszukiwania).
+-   [x] Optymalizacja SQLite: włączenie trybu WAL (`PRAGMA journal_mode=WAL;`) oraz `PRAGMA busy_timeout=5000;` dla bezkolizyjnej pracy 24/7.
+-   [x] Zrównoleglenie pobierania kandydatów w TMDB Discovery (`asyncio.gather` z semaforem) w celu skrócenia czasu generowania rekomendacji.
+-   [x] Rozszerzenie serwera MCP o narzędzie `get_trailer` oraz uwzględnienie linków `trailer_url` w `get_recommendations`.
 
-**Akceptacja:** Użytkownik może obejrzeć zwiastun prosto z karty przed podjęciem decyzji; operacje zapisu i odczytu nie blokują bazy SQLite.
+**Akceptacja:** Użytkownik może obejrzeć zwiastun prosto z karty przed podjęciem decyzji lub zapytać o zwiastun w MCP (Antigravity / ChatGPT); operacje zapisu i odczytu nie blokują bazy SQLite dzięki WAL. (Ukończono pomyślnie)
 
 ## Etap 7 -- Konteneryzacja i wdrożenie na Proxmox
 

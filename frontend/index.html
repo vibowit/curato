@@ -147,6 +147,34 @@
     </div>
   </div>
 
+  <!-- Modal: Odtwarzacz Zwiastuna -->
+  <div id="modal-trailer" class="modal-overlay hidden">
+    <div class="modal-dialog modal-video">
+      <div class="modal-header">
+        <h3 id="modal-trailer-title">Zwiastun</h3>
+        <button class="modal-close" data-close-trailer>&times;</button>
+      </div>
+      <div class="modal-body modal-video-body">
+        <div id="trailer-player-container" class="video-container">
+          <!-- iframe dynamically injected when opened, cleared on close -->
+        </div>
+        <div id="trailer-fallback-container" class="trailer-fallback hidden">
+          <div class="fallback-icon">🎬</div>
+          <p id="trailer-fallback-text">Brak bezpośredniego zwiastuna w bazie TMDB dla tej pozycji.</p>
+          <a id="trailer-fallback-link" href="#" target="_blank" rel="noopener noreferrer" class="btn btn-primary">
+            🔍 Szukaj zwiastuna na YouTube
+          </a>
+        </div>
+      </div>
+      <div class="modal-footer modal-video-footer">
+        <a id="trailer-direct-link" href="#" target="_blank" rel="noopener noreferrer" class="btn btn-secondary btn-sm">
+          Otwórz na YouTube ↗
+        </a>
+        <button type="button" class="btn btn-secondary btn-sm" data-close-trailer>Zamknij</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Toast Container -->
   <div id="toast-container" class="toast-container"></div>
 

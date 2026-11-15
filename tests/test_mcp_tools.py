@@ -47,6 +47,7 @@ async def test_mcp_list_tools():
         "record_decision",
         "approve_recommendations",
         "get_recommendation_history",
+        "get_trailer",
     }
     assert expected.issubset(tool_names)
 
@@ -318,3 +319,64 @@ async def test_get_recommendation_history(setup_mcp_db):
     data = json.loads(res.content[0].text)
     assert data["total_runs"] == 2
     assert len(data["runs"]) == 2
+
+
+@pytest.mark.asyncio
+async def test_get_trailer_tool_success_and_fallback(setup_mcp_db):
+    """Verifies get_trailer tool retrieves trailer by recommendation_id or title."""
+    TestingSession = setup_mcp_db
+    rec_id = None
+    with TestingSession() as db:
+        run = RecommendationRun(status="completed", summary="Run with trailer")
+        db.add(run)
+        db.flush()
+
+        media = MediaItem(
+            media_type="movie",
+            title="Oppenheimer",
+            year=2023,
+            tmdb_id=872585,
+            metadata_json=json.dumps(
+                {
+                    "trailer_key": "uYPbbksJxIg",
+                    "trailer_url": "https://www.youtube.com/watch?v=uYPbbksJxIg",
+                }
+            ),
+        )
+        db.add(media)
+        db.flush()
+
+        rec = Recommendation(
+            run_id=run.id,
+            media_item_id=media.id,
+            match_score=95.0,
+            confidence=0.9,
+            reason="Biographical epic drama.",
+            status="pending",
+        )
+        db.add(rec)
+        db.commit()
+        rec_id = rec.id
+
+    # 1. Fetch by recommendation_id
+    res1 = await mcp_server.call_tool("get_trailer", {"recommendation_id": rec_id})
+    assert not res1.is_error
+    data1 = json.loads(res1.content[0].text)
+    assert data1["success"] is True
+    assert data1["title"] == "Oppenheimer"
+    assert data1["has_official_trailer"] is True
+    assert data1["trailer_url"] == "https://www.youtube.com/watch?v=uYPbbksJxIg"
+
+    # 2. Fetch by title
+    res2 = await mcp_server.call_tool("get_trailer", {"title": "Oppenheimer"})
+    assert not res2.is_error
+    data2 = json.loads(res2.content[0].text)
+    assert data2["success"] is True
+    assert data2["recommendation_id"] == rec_id
+    assert data2["has_official_trailer"] is True
+
+    # 3. Missing recommendation/title
+    res3 = await mcp_server.call_tool("get_trailer", {})
+    assert not res3.is_error
+    data3 = json.loads(res3.content[0].text)
+    assert data3["error"] is True

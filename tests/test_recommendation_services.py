@@ -369,3 +369,107 @@ async def test_recommendation_service_no_profile_fails(test_db: Session):
     with pytest.raises(InvalidStateException) as exc_info:
         await service.create_recommendation_run(test_db)
     assert exc_info.value.error_code == "INVALID_STATE"
+
+
+@pytest.mark.asyncio
+async def test_recommendation_trailer_hydration_and_get_or_fetch(
+    test_db: Session, sample_profile_content
+):
+    import json
+    from unittest.mock import AsyncMock, MagicMock
+
+    profile = TasteProfile(
+        version="v1.0-gemini",
+        active=True,
+        profile_json=sample_profile_content.model_dump_json(),
+    )
+    test_db.add(profile)
+    test_db.commit()
+
+    mock_tmdb = MagicMock()
+    mock_tmdb.get_movie_videos = AsyncMock(
+        return_value={
+            "results": [
+                {
+                    "site": "YouTube",
+                    "key": "test_trailer_key_101",
+                    "type": "Trailer",
+                    "official": True,
+                }
+            ]
+        }
+    )
+    mock_tmdb.get_show_videos = AsyncMock(
+        return_value={
+            "results": [
+                {
+                    "site": "YouTube",
+                    "key": "test_trailer_key_201",
+                    "type": "Trailer",
+                    "official": True,
+                }
+            ]
+        }
+    )
+    mock_tmdb.extract_best_trailer.side_effect = lambda res: {
+        "trailer_key": res["results"][0]["key"],
+        "trailer_url": f"https://www.youtube.com/watch?v={res['results'][0]['key']}",
+        "name": "Trailer",
+        "site": "YouTube",
+    } if res.get("results") else None
+
+    class MockDiscovery(DiscoveryService):
+        def __init__(self):
+            super().__init__(tmdb_client=mock_tmdb)
+
+        async def discover_candidates(self, db, profile, exclude_genres=None, **kwargs):
+            return [
+                CandidateItem(
+                    tmdb_id=101,
+                    media_type="movie",
+                    title="Prisoners",
+                    year=2013,
+                    genres=["Crime", "Drama"],
+                    director_or_creator="Denis Villeneuve",
+                    vote_average=8.1,
+                    source_strategy="similar_to_favorites",
+                ),
+                CandidateItem(
+                    tmdb_id=201,
+                    media_type="show",
+                    title="Mindhunter",
+                    year=2017,
+                    genres=["Crime", "Drama"],
+                    director_or_creator="David Fincher",
+                    vote_average=8.6,
+                    source_strategy="director",
+                ),
+            ]
+
+    service = RecommendationService(
+        discovery_service=MockDiscovery(),
+        llm_provider=MockLLM(),
+    )
+
+    req = RecommendationRunCreateRequest(movie_limit=1, show_limit=1)
+    run = await service.create_recommendation_run(test_db, req)
+
+    # Verify run succeeded
+    assert run.status == "completed"
+    schema = service.to_read_schema(run)
+    assert len(schema.recommendations) == 2
+
+    rec1 = schema.recommendations[0]
+    assert rec1.trailer_key is not None
+    assert "https://www.youtube.com/watch?v=" in rec1.trailer_url
+
+    # Check database media_item metadata_json
+    media_item = test_db.query(MediaItem).filter(MediaItem.tmdb_id == 101).one()
+    meta = json.loads(media_item.metadata_json)
+    assert meta["trailer_key"] == "test_trailer_key_101"
+
+    # Test get_or_fetch_trailer
+    trailer_res = await service.get_or_fetch_trailer(test_db, rec1.id)
+    assert trailer_res.recommendation_id == rec1.id
+    assert trailer_res.trailer_key == rec1.trailer_key
+    assert trailer_res.trailer_url == rec1.trailer_url

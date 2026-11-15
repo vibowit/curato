@@ -5,8 +5,8 @@ status: in_progress
 priority: P1
 category: dev
 created: "2026-11-06"
-updated: "2026-11-14"
-next_action: "Zrealizować Etap 6 (Zwiastuny i optymalizacja współbieżności bazy WAL) lub Etap 7 (Konteneryzacja pod Proxmox) wg ustalonego planu"
+updated: "2026-11-15"
+next_action: "Zrealizować Etap 7 (Konteneryzacja i wdrożenie na Proxmox) wg ustalonego planu"
 tags:
   - movie-recommendation
   - simkl
@@ -88,6 +88,15 @@ Jasno zdefiniowany cel końcowy projektu (MVP):
     - Zintegrowano transport SSE / Streamable HTTP (`/mcp/sse`, `/mcp/messages/`) z dedykowanym middleware autoryzacyjnym `MCPAuthMiddleware` chroniącym endpoint tokenem `MCP_API_KEY` (dla ChatGPT / zdalnych asystentów).
     - Zaimplementowano harmonogram `AsyncIOScheduler` (`app/core/scheduler.py`) z cotygodniowym zadaniem synchronizacji i generowania nowej edycji oraz endpointy REST w `app/api/v1/scheduler.py` (`GET /api/scheduler/status`, `POST /api/scheduler/trigger`).
     - Rozszerzono zestaw testów automatycznych do **103 testów** (`pytest`) przechodzących w 100% z pełną zgodnością lintera i formatera `ruff`.
+  - Zrealizowano i przetestowano **Etap 6 (Zwiastuny i optymalizacja współbieżności bazy WAL)**:
+    - Włączono optymalizacje współbieżności bazy SQLite pod pracę 24/7 (`app/core/database.py`): `PRAGMA foreign_keys=ON;`, `PRAGMA journal_mode=WAL;`, `PRAGMA busy_timeout=5000;`, `PRAGMA synchronous=NORMAL;`.
+    - Rozszerzono klienta TMDB (`app/integrations/tmdb.py`) o endpointy `/movie/{id}/videos` i `/tv/{id}/videos` oraz algorytm selekcji `extract_best_trailer` priorytetyzujący oficjalne zwiastuny YouTube.
+    - Zoptymalizowano `DiscoveryService` (`app/services/discovery.py`) wprowadzając równoległe pobieranie kandydatów z TMDB (`asyncio.gather` z `asyncio.Semaphore(5)`).
+    - Zaktualizowano schematy Pydantic (`app/schemas/recommendation.py`) o `trailer_key`, `trailer_url` oraz model `TrailerResponse`.
+    - Wdrożono hydrację zwiastunów dla finałowej puli 15 pozycji w `RecommendationService` (`app/services/recommendations.py`) z persystencją w `MediaItem.metadata_json` oraz dedykowany endpoint REST `GET /api/recommendations/{id}/trailer`.
+    - Rozszerzono serwer MCP (`app/mcp/server.py`) o 9. narzędzie domenowe `get_trailer` oraz uwzględnienie linku `trailer_url` w odpowiedzi narzędzia `get_recommendations`.
+    - Zaimplementowano interfejs wideo w SPA (`frontend/index.html`, `frontend/styles.css`, `frontend/app.js`): przycisk `🎬 Zwiastun` na kartach, responsywny modal 16:9 z osadzonym odtwarzaczem `youtube-nocookie.com` (automatyczne niszczenie `iframe` przy zamykaniu) oraz fallback do wyszukiwarki YouTube.
+    - Rozszerzono zestaw testów automatycznych do **108 testów** (`pytest`) przechodzących w 100% z pełną zgodnością lintera i formatera `ruff`.
 - **Kluczowe moduły**:
   - `app/main.py` — fabryka aplikacji FastAPI, montowanie SSE MCP (`/mcp`), serwowanie frontendu, lifespan, middleware i obsługa błędów
   - `app/core/` — konfiguracja Pydantic Settings, silnik bazy SQLite, harmonogram (`scheduler.py`) i logowanie
@@ -108,7 +117,7 @@ Jasno zdefiniowany cel końcowy projektu (MVP):
   - `migrations/` — migracje bazy danych Alembic
   - `scripts/poc_taste_engine.py` — samodzielny skrypt badawczy PoC
   - `scripts/get_simkl_token.py` — asystent autoryzacji OAuth 2.0 Simkl Device Flow
-  - `tests/` — testy jednostkowe i integracyjne (103 testy)
+  - `tests/` — testy jednostkowe i integracyjne (108 testów)
   - `data/` — lokalna baza SQLite i pliki wyjściowe
 
 ## Najbliższy Krok (Next Action)
@@ -163,11 +172,12 @@ Brak. Wszystkie etapy MVP (PoC, 0, 1, 2, 3, 4, 5) są w pełni zaimplementowane 
 - [x] Monitoring i endpointy zarządzania harmonogramem
 
 ### Etap 6: Zwiastuny i optymalizacja współbieżności
-- [ ] Integracja TMDB Videos (`/movie/{id}/videos`, `/tv/{id}/videos`) w kliencie TMDB
-- [ ] Rozszerzenie schematów i metadanych `MediaItem` o `trailer_url` / `trailer_key`
-- [ ] Interfejs UI: przycisk zwiastuna i modal z osadzonym odtwarzaczem YouTube (`youtube-nocookie`) oraz fallback wyszukiwania
-- [ ] Optymalizacja współbieżności SQLite pod usługę 24/7 (`PRAGMA journal_mode=WAL;`, `PRAGMA busy_timeout=5000;`)
-- [ ] Zrównoleglenie odpytywania TMDB w `discovery.py` (`asyncio.gather` z semaforem)
+- [x] Integracja TMDB Videos (`/movie/{id}/videos`, `/tv/{id}/videos`) w kliencie TMDB
+- [x] Rozszerzenie schematów i metadanych `MediaItem` o `trailer_url` / `trailer_key`
+- [x] Interfejs UI: przycisk zwiastuna i modal z osadzonym odtwarzaczem YouTube (`youtube-nocookie`) oraz fallback wyszukiwania
+- [x] Optymalizacja współbieżności SQLite pod usługę 24/7 (`PRAGMA journal_mode=WAL;`, `PRAGMA busy_timeout=5000;`, `PRAGMA synchronous=NORMAL;`)
+- [x] Zrównoleglenie odpytywania TMDB w `discovery.py` (`asyncio.gather` z semaforem)
+- [x] Rozszerzenie serwera MCP o narzędzie `get_trailer` oraz zwracanie `trailer_url` w `get_recommendations`
 
 ### Etap 7: Konteneryzacja i wdrożenie na Proxmox
 - [ ] Wieloetapowy `Dockerfile` (Python 3.11-slim, użytkownik nieuprzywilejowany `appuser`, healthcheck `/api/health`)
@@ -306,3 +316,14 @@ Brak. Wszystkie etapy MVP (PoC, 0, 1, 2, 3, 4, 5) są w pełni zaimplementowane 
   3. **Mitygacja ryzyk GitHuba**: Wyłączenie sekcji Issues, Discussions i Pull Requests w ustawieniach repozytorium (ochrona przed narzutem obsługi społeczności), bezwzględne ignorowanie bazy i danych (`/data/`) oraz publikacja czystej historii (`orphan branch`) z audytem `gitleaks`.
   4. **Własna Gitea jako Pasywny Mirror (Pull Mirror)**: Gitea w homelabie będzie automatycznie ściągać commity z GitHuba (zero bezpośrednich pushów z komputera, brak ryzyka rozjechania stanu). Służy jako suwerenny backup off-cloud oraz punkt pobierania kodu przez Proxmox w sieci LAN bez zależności od łącza internetowego.
 - **Uzasadnienie**: Maksymalizacja korzyści inżynierskich i portfolio przy jednoczesnym wyeliminowaniu narzutu operacyjnego i ryzyk bezpieczeństwa.
+
+### 2026-11-15 — Wdrożenie Etapu 6 (Zwiastuny, optymalizacja współbieżności WAL i MCP get_trailer)
+- **Decyzja / Zmiana**:
+  1. Włączono optymalizacje współbieżności SQLite pod pracę 24/7 (`PRAGMA foreign_keys=ON;`, `PRAGMA journal_mode=WAL;`, `PRAGMA busy_timeout=5000;`, `PRAGMA synchronous=NORMAL;`), eliminując blokady bazy danych pomiędzy zapytaniami API, serwerem MCP a zadaniami schedulera w tle.
+  2. Zaimplementowano pobieranie wideo zwiastunów w `TMDBClient` (`/movie/{id}/videos`, `/tv/{id}/videos`) z algorytmem `extract_best_trailer` priorytetyzującym oficjalne zwiastuny YouTube.
+  3. Zrównoleglono agregację kandydatów w `DiscoveryService` za pomocą `asyncio.gather` z semaforem (`asyncio.Semaphore(5)`).
+  4. Dodano pola `trailer_key` i `trailer_url` do schematów `CandidateItem`, `MediaItemSummary`, `RecommendationRead` oraz model `TrailerResponse`, zapisując metadane w `metadata_json` bez konieczności migracji schematu tabeli bazy danych.
+  5. Wdrożono endpoint REST `GET /api/recommendations/{id}/trailer` oraz 9. narzędzie serwera MCP `get_trailer`, a także wzbogacono narzędzie `get_recommendations` o bezpośrednie linki do zwiastunów YouTube.
+  6. Wdrożono odtwarzacz zwiastunów w UI SPA (`youtube-nocookie.com`, responsywny kontener 16:9, przycisk zwiastuna na kartach, natychmiastowe zatrzymywanie odtwarzania przy zamykaniu modala, fallback wyszukiwania).
+  7. Rozszerzono zestaw testów automatycznych do **108 testów** (`pytest`) przechodzących w 100% oraz pełną zgodność lintera `ruff`.
+- **Uzasadnienie**: Spełnienie kryteriów akceptacji Etapu 6 z ROADMAP.md: użytkownik może wygodnie obejrzeć zwiastun w przeglądarce przed podjęciem decyzji oraz poprosić o zwiastun asystenta MCP (Antigravity / ChatGPT), a baza SQLite działa bezkolizyjnie w trybie WAL.
