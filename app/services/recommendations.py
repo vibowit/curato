@@ -665,12 +665,16 @@ class RecommendationService:
             trailer_url = None
             if rec.media_item:
                 poster_path = None
+                vote_avg = None
                 if rec.media_item.metadata_json:
                     try:
                         meta = json.loads(rec.media_item.metadata_json)
                         poster_path = meta.get("poster_path")
                         trailer_key = meta.get("trailer_key")
                         trailer_url = meta.get("trailer_url")
+                        raw_vote = meta.get("vote_average")
+                        if raw_vote is not None:
+                            vote_avg = float(raw_vote)
                     except Exception:
                         pass
                 media_summary = MediaItemSummary(
@@ -685,6 +689,7 @@ class RecommendationService:
                     poster_path=poster_path,
                     trailer_key=trailer_key,
                     trailer_url=trailer_url,
+                    vote_average=vote_avg,
                 )
 
             latest_decision = None

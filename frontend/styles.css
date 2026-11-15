@@ -416,19 +416,38 @@ body {
   line-height: 1;
 }
 
-.confidence-badge {
+.rating-badge {
   height: 28px;
   box-sizing: border-box;
-  font-size: 0.72rem;
-  font-weight: 500;
+  font-size: 0.75rem;
+  font-weight: 700;
   padding: 0 0.5rem;
   border-radius: var(--radius-sm);
-  background-color: rgba(51, 65, 85, 0.4);
-  color: var(--text-muted);
-  border: 1px solid rgba(100, 116, 139, 0.3);
+  background-color: rgba(234, 179, 8, 0.15);
+  color: #facc15;
+  border: 1px solid rgba(234, 179, 8, 0.35);
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  gap: 0.2rem;
+  white-space: nowrap;
+  line-height: 1;
+}
+
+.warning-badge {
+  height: 28px;
+  box-sizing: border-box;
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 0 0.45rem;
+  border-radius: var(--radius-sm);
+  background-color: rgba(249, 115, 22, 0.15);
+  color: #fb923c;
+  border: 1px solid rgba(249, 115, 22, 0.35);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
   white-space: nowrap;
   line-height: 1;
 }

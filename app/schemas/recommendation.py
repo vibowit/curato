@@ -82,6 +82,7 @@ class MediaItemSummary(BaseModel):
     poster_path: Optional[str] = None
     trailer_key: Optional[str] = None
     trailer_url: Optional[str] = None
+    vote_average: Optional[float] = None
 
     model_config = {"from_attributes": True}
 

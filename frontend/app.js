@@ -199,7 +199,8 @@ document.addEventListener("DOMContentLoaded", () => {
       : null;
 
     const matchPercent = Math.round(rec.match_score);
-    const confidenceText = rec.confidence >= 0.8 ? "Wysoka pewność" : "Dobra pewność";
+    const tmdbRating = media.vote_average ? Number(media.vote_average).toFixed(1) : null;
+    const isLowConfidence = rec.confidence < 0.75;
 
     // Status mapping
     const statusMap = {
@@ -236,8 +237,9 @@ document.addEventListener("DOMContentLoaded", () => {
           <span class="card-year">${year}</span>
         </div>
         <div class="card-match-bar">
-          <span class="match-score-badge" title="Dopasowanie do gustu">${matchPercent}%</span>
-          <span class="confidence-badge" title="Pewność rekomendacji">${confidenceText}</span>
+          <span class="match-score-badge" title="Dopasowanie do profilu gustu">${matchPercent}% dopasowania</span>
+          ${tmdbRating ? `<span class="rating-badge" title="Ocena społeczności TMDB">★ ${tmdbRating}</span>` : ""}
+          ${isLowConfidence ? `<span class="warning-badge" title="Ograniczone metadane w bazie dla tego tytułu">⚠️ Mało danych</span>` : ""}
           <button class="btn-card-trailer" data-action="trailer" data-id="${rec.id}" title="Obejrzyj oficjalny zwiastun">
             🎬 Zwiastun
           </button>
