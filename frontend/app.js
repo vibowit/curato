@@ -236,11 +236,11 @@ document.addEventListener("DOMContentLoaded", () => {
           <span class="card-year">${year}</span>
         </div>
         <div class="card-match-bar">
-          <span class="match-score-badge">${matchPercent}% dopasowania</span>
+          <span class="match-score-badge" title="Dopasowanie do gustu">${matchPercent}%</span>
+          <span class="confidence-badge" title="Pewność rekomendacji">${confidenceText}</span>
           <button class="btn-card-trailer" data-action="trailer" data-id="${rec.id}" title="Obejrzyj oficjalny zwiastun">
             🎬 Zwiastun
           </button>
-          <span class="confidence-text">${confidenceText}</span>
         </div>
         <div class="card-reason">
           ${rec.reason}

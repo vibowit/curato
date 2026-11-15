@@ -394,22 +394,43 @@ body {
 .card-match-bar {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 0.4rem;
   margin-bottom: 0.85rem;
+  flex-wrap: nowrap;
 }
 
 .match-score-badge {
-  font-size: 0.8rem;
+  height: 28px;
+  box-sizing: border-box;
+  font-size: 0.75rem;
   font-weight: 700;
-  padding: 0.2rem 0.5rem;
+  padding: 0 0.55rem;
   border-radius: var(--radius-sm);
   background-color: rgba(16, 185, 129, 0.2);
   color: #34d399;
+  border: 1px solid rgba(16, 185, 129, 0.35);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  white-space: nowrap;
+  line-height: 1;
 }
 
-.confidence-text {
-  font-size: 0.75rem;
+.confidence-badge {
+  height: 28px;
+  box-sizing: border-box;
+  font-size: 0.72rem;
+  font-weight: 500;
+  padding: 0 0.5rem;
+  border-radius: var(--radius-sm);
+  background-color: rgba(51, 65, 85, 0.4);
   color: var(--text-muted);
+  border: 1px solid rgba(100, 116, 139, 0.3);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  white-space: nowrap;
+  line-height: 1;
 }
 
 .card-reason {
@@ -755,7 +776,9 @@ body {
 }
 
 .btn-card-trailer {
-  padding: 0.3rem 0.6rem;
+  height: 28px;
+  box-sizing: border-box;
+  padding: 0 0.6rem;
   font-size: 0.75rem;
   font-weight: 600;
   border-radius: var(--radius-sm);
@@ -765,9 +788,12 @@ body {
   cursor: pointer;
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 0.35rem;
   transition: all 0.2s ease;
   white-space: nowrap;
+  line-height: 1;
+  margin-left: auto;
 }
 
 .btn-card-trailer:hover {
