@@ -1,12 +1,12 @@
 ---
 id: "movie-recommend"
 title: "Curato — System Rekomendacji Filmów i Seriali (Simkl + Gemini/OpenAI + FastAPI + MCP)"
-status: ready_for_deployment
+status: deployed_in_production
 priority: P1
 category: dev
 created: "2026-11-06"
 updated: "2026-11-15"
-next_action: "Skonfigurować Gitea Pull Mirror oraz uruchomić kontener Curato na Proxmoxie r2d2 wg docs/deploy-r2d2.md"
+next_action: "Skonfigurować zdalny serwer MCP Curato w ChatGPT lub przeprowadzić pierwszą synchronizację Simkl przez panel https://curato.app.witkowski.xyz"
 tags:
   - movie-recommendation
   - simkl
@@ -332,14 +332,13 @@ Brak. Wszystkie etapy MVP (PoC, 0, 1, 2, 3, 4, 5) są w pełni zaimplementowane 
   7. Rozszerzono zestaw testów automatycznych do **108 testów** (`pytest`) przechodzących w 100% oraz pełną zgodność lintera `ruff`.
 - **Uzasadnienie**: Spełnienie kryteriów akceptacji Etapu 6 z ROADMAP.md: użytkownik może wygodnie obejrzeć zwiastun w przeglądarce przed podjęciem decyzji oraz poprosić o zwiastun asystenta MCP (Antigravity / ChatGPT), a baza SQLite działa bezkolizyjnie w trybie WAL.
 
-### 2026-11-15 — Nazwa Curato i wdrożenie uniwersalnej konteneryzacji w repozytorium (Krok 1)
+### 2026-11-15 — Pomyślne wdrożenie produkcyjne na serwerze Proxmox VE (r2d2)
 - **Decyzja / Zmiana**:
-  1. Przyjęto oficjalną nazwę serwisu i repozytorium: **Curato** (zaktualizowano metadane w `pyproject.toml`, serwis w `docker-compose.yml` oraz komunikaty startowe).
-  2. Rozdzielono dotychczasowy Etap 7 na dwa odrębne obszary:
-     - Uniwersalna część w repozytorium: `Dockerfile`, `.dockerignore`, `scripts/entrypoint.sh`, `docker-compose.yml`.
-     - Prywatna część wdrożeniowa: specyfika hosta Proxmox `r2d2`, reverse proxy i certyfikaty SSL trzymane poza publicznym repozytorium.
-  3. Zaimplementowano produkcyjny `Dockerfile` (multi-stage z `uv`, `appuser` UID 1000, `HEALTHCHECK` `/api/health`).
-  4. Zaimplementowano wykonywalny `scripts/entrypoint.sh` wykonujący bezobsługowo migracje `alembic upgrade head` i walidujący uprawnienia zapisu do katalogu bazy (SQLite WAL) przed przekazaniem kontroli do `uvicorn`.
-  5. Skonfigurowano `.dockerignore` oraz `docker-compose.yml` z trwałym montowaniem wolumenu `./data:/app/data`.
-  6. Zachowano 100% zgodności testów automatycznych (108 testów przechodzi) oraz czystości lintera `ruff`.
-- **Uzasadnienie**: Umożliwienie natychmiastowego uruchomienia Curato jednym poleceniem w dowolnym środowisku kontenerowym oraz przygotowanie repozytorium do czystej publikacji na GitHubie wraz z weryfikacją budowy kontenera w GitHub Actions.
+  1. Utworzono dedykowany nieuprzywilejowany kontener LXC Debian 12 (CT 133 `curato`, 2 vCPU, 2 GB RAM, 15 GB na ZFS `fast-tank`) w VLAN 30 na Proxmoxie `r2d2`.
+  2. Zainstalowano oficjalny pakiet Docker Engine i Docker Compose wewnątrz LXC z `nesting=1,keyctl=1`.
+  3. Skonfigurowano uprawnienia wolumenu bazy SQLite WAL pod użytkownika `appuser` (UID 1000) oraz zsynchronizowano konfigurację produkcyjną `.env`.
+  4. Wyeliminowano problem shebangu wirtualnego środowiska wieloetapowego Dockera (`WORKDIR /app` w etapie builder i `python -m alembic`) oraz zaktualizowano `uv.lock` o brakujące zależności etapu 5 (`apscheduler`, `mcp`, `sse-starlette`).
+  5. Zweryfikowano działanie kontenera (status `healthy`, automatyczne migracje bazy SQLite, scheduler aktywny).
+  6. Zintegrowano usługę z Reverse Proxy Caddy (CT 111 `caddy-proxy`) z przypisaniem IP `192.168.1.36` oraz publiczną domeną `https://curato.app.witkowski.xyz` i wyłączeniem buforowania (`flush_interval -1`).
+  7. Zweryfikowano poprawność certyfikatu SSL, panelu Web UI oraz strumieniowania SSE endpointu MCP (`/mcp/sse`) z poprawną autoryzacją tokenem `MCP_API_KEY`.
+- **Uzasadnienie**: Zakończenie pełnego cyklu wytwórczego i wdrożeniowego projektu: Curato działa stabilnie 24/7 jako mikro-usługa w homelabie z bezpiecznym dostępem dla ChatGPT i Antigravity.
