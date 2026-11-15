@@ -165,8 +165,8 @@ uv run ruff check app tests
 
 ---
 
-## License & Project Status
+## License & Discussions
 
 Curato is open source under the [MIT License](LICENSE).
 
-This repository is maintained as a personal portfolio project and single-user deployment. GitHub Issues and Pull Requests are disabled. You are welcome to fork and adapt the code for your own setup.
+This repository is maintained as a personal portfolio project and single-user deployment. GitHub Issues and Pull Requests are disabled, but **[GitHub Discussions](https://github.com/vibowit/curato/discussions)** are open for questions, ideas, and architecture discussions. You are welcome to fork and adapt the code for your own setup.
