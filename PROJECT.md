@@ -1,12 +1,12 @@
 ---
 id: "movie-recommend"
-title: "System Rekomendacji Filmów i Seriali (Simkl + Gemini/OpenAI + FastAPI + MCP)"
+title: "Curato — System Rekomendacji Filmów i Seriali (Simkl + Gemini/OpenAI + FastAPI + MCP)"
 status: in_progress
 priority: P1
 category: dev
 created: "2026-11-06"
 updated: "2026-11-15"
-next_action: "Zrealizować Etap 7 (Konteneryzacja i wdrożenie na Proxmox) wg ustalonego planu"
+next_action: "Skonsultować z użytkownikiem rozpoczęcie Kroku 2: Przygotowanie repozytorium GitHub (Curato), GitHub Actions CI/CD i Gitea mirror"
 tags:
   - movie-recommendation
   - simkl
@@ -180,11 +180,12 @@ Brak. Wszystkie etapy MVP (PoC, 0, 1, 2, 3, 4, 5) są w pełni zaimplementowane 
 - [x] Rozszerzenie serwera MCP o narzędzie `get_trailer` oraz zwracanie `trailer_url` w `get_recommendations`
 
 ### Etap 7: Konteneryzacja i wdrożenie na Proxmox
-- [ ] Wieloetapowy `Dockerfile` (Python 3.11-slim, użytkownik nieuprzywilejowany `appuser`, healthcheck `/api/health`)
-- [ ] Skrypt startowy `entrypoint.sh` automatycznie wykonujący migracje `alembic upgrade head` przed startem `uvicorn`
-- [ ] Konfiguracja `docker-compose.yml` z trwałym montowaniem wolumenu `./data:/app/data`, restart policy i zmiennymi `.env`
-- [ ] Procedura wdrożenia na Proxmox VE (kontener LXC Debian z Dockerem, kopie zapasowe wolumenu w PBS/VZDump)
-- [ ] Konfiguracja Reverse Proxy (Nginx Proxy Manager / Caddy) z certyfikatem SSL pod bezpieczny dostęp zdalny i MCP SSE dla ChatGPT
+- [x] Wieloetapowy `Dockerfile` (Python 3.11-slim, instalacja `uv`, użytkownik nieuprzywilejowany `appuser`, healthcheck `/api/health`)
+- [x] Skrypt startowy `scripts/entrypoint.sh` z automatycznymi migracjami `alembic upgrade head` i walidacją uprawnień SQLite WAL przed startem `uvicorn`
+- [x] Konfiguracja `docker-compose.yml` dla serwisu `curato` z trwałym montowaniem wolumenu `./data:/app/data`, restart policy i zmiennymi `.env`
+- [x] Plik `.dockerignore` chroniący przed wbudowaniem bazy, logów, wirtualnego środowiska i plików testowych do obrazu
+- [ ] Procedura wdrożenia na Proxmox VE r2d2 (kontener LXC Debian z Dockerem, uprawnienia UID 1000, kopie zapasowe wolumenu w PBS/VZDump)
+- [ ] Konfiguracja Reverse Proxy (Caddy / Nginx) z certyfikatem SSL i wyłączonym buforowaniem pod bezpieczny serwer MCP SSE dla ChatGPT
 
 ### Etap 8: Upublicznienie kodu (GitHub Showcase) i lokalny Mirror (Gitea) [Bez Docker Hub]
 - [ ] Audyt bezpieczeństwa repozytorium: weryfikacja `.gitignore`, wykluczenie katalogu `/data/` i bazy SQLite, skanowanie historii git (`gitleaks`), szablon `.env.example`
@@ -327,3 +328,15 @@ Brak. Wszystkie etapy MVP (PoC, 0, 1, 2, 3, 4, 5) są w pełni zaimplementowane 
   6. Wdrożono odtwarzacz zwiastunów w UI SPA (`youtube-nocookie.com`, responsywny kontener 16:9, przycisk zwiastuna na kartach, natychmiastowe zatrzymywanie odtwarzania przy zamykaniu modala, fallback wyszukiwania).
   7. Rozszerzono zestaw testów automatycznych do **108 testów** (`pytest`) przechodzących w 100% oraz pełną zgodność lintera `ruff`.
 - **Uzasadnienie**: Spełnienie kryteriów akceptacji Etapu 6 z ROADMAP.md: użytkownik może wygodnie obejrzeć zwiastun w przeglądarce przed podjęciem decyzji oraz poprosić o zwiastun asystenta MCP (Antigravity / ChatGPT), a baza SQLite działa bezkolizyjnie w trybie WAL.
+
+### 2026-11-15 — Nazwa Curato i wdrożenie uniwersalnej konteneryzacji w repozytorium (Krok 1)
+- **Decyzja / Zmiana**:
+  1. Przyjęto oficjalną nazwę serwisu i repozytorium: **Curato** (zaktualizowano metadane w `pyproject.toml`, serwis w `docker-compose.yml` oraz komunikaty startowe).
+  2. Rozdzielono dotychczasowy Etap 7 na dwa odrębne obszary:
+     - Uniwersalna część w repozytorium: `Dockerfile`, `.dockerignore`, `scripts/entrypoint.sh`, `docker-compose.yml`.
+     - Prywatna część wdrożeniowa: specyfika hosta Proxmox `r2d2`, reverse proxy i certyfikaty SSL trzymane poza publicznym repozytorium.
+  3. Zaimplementowano produkcyjny `Dockerfile` (multi-stage z `uv`, `appuser` UID 1000, `HEALTHCHECK` `/api/health`).
+  4. Zaimplementowano wykonywalny `scripts/entrypoint.sh` wykonujący bezobsługowo migracje `alembic upgrade head` i walidujący uprawnienia zapisu do katalogu bazy (SQLite WAL) przed przekazaniem kontroli do `uvicorn`.
+  5. Skonfigurowano `.dockerignore` oraz `docker-compose.yml` z trwałym montowaniem wolumenu `./data:/app/data`.
+  6. Zachowano 100% zgodności testów automatycznych (108 testów przechodzi) oraz czystości lintera `ruff`.
+- **Uzasadnienie**: Umożliwienie natychmiastowego uruchomienia Curato jednym poleceniem w dowolnym środowisku kontenerowym oraz przygotowanie repozytorium do czystej publikacji na GitHubie wraz z weryfikacją budowy kontenera w GitHub Actions.

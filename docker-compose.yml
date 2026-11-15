@@ -1,0 +1,17 @@
+services:
+  curato:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: curato:latest
+    container_name: curato
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - ENVIRONMENT=production
+      - SQLITE_DB_PATH=/app/data/movie_recommend.db
+    env_file:
+      - .env
+    volumes:
+      - ./data:/app/data

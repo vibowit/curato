@@ -1,107 +1,180 @@
-# System Rekomendacji Filmów i Seriali (Movie & Show Recommender)
+# Curato 🎬🍿
 
-Prywatny system rekomendacji filmów i seriali oparty na Twojej historii i ocenach z **Simkl**, dynamicznym wersjonowaniu profilu gustu oraz analizie **LLM (Gemini/OpenAI)** i bazie **TMDB**.
+[![CI](https://github.com/vibowit/curato/actions/workflows/ci.yml/badge.svg)](https://github.com/vibowit/curato/actions/workflows/ci.yml)
+[![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.110+-009688.svg?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
+[![Model Context Protocol](https://img.shields.io/badge/MCP-2.0+-purple.svg)](https://modelcontextprotocol.io/)
+[![SQLite WAL](https://img.shields.io/badge/SQLite-WAL%20mode-003B57.svg?logo=sqlite&logoColor=white)](https://www.sqlite.org/wal.html)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-System udostępnia:
-- **Webowy panel użytkownika (SPA)** serwowany przez FastAPI (`http://localhost:8000/`) do przeglądu propozycji, podejmowania decyzji (`Zaakceptuj`, `Odrzuć`, `Już widziałem`, `Później`) i bezpiecznego dodawania pozycji do Simkl Plan to Watch.
-- **REST API + Swagger UI** (`http://localhost:8000/docs`).
-- **Serwer Model Context Protocol (MCP)**:
-  - **STDIO**: dla lokalnych asystentów AI (Antigravity IDE / CLI, Claude Desktop, Cursor).
-  - **HTTPS / SSE**: dla ChatGPT (Custom Actions) i zdalnych klientów.
-- **Harmonogram w tle**: cotygodniowa synchronizacja i automatyczne generowanie świeżej edycji.
+**Curato** is a self-hosted, private movie and TV show recommendation engine. It continuously learns from your personal watch history and ratings on **Simkl**, builds a versioned taste profile, sources candidates from **TMDB**, and leverages **LLMs (Google Gemini / OpenAI)** for multi-factor semantic scoring and reasoning.
+
+It provides a lightweight web dashboard, a full REST API, and native **Model Context Protocol (MCP)** integration for AI assistants (Antigravity IDE/CLI, Cursor, Claude Desktop, and ChatGPT).
 
 ---
 
-## 1. Wymagania i instalacja
+## ✨ Key Features
 
-Projekt korzysta z Pythona 3.11+ oraz menedżera `uv` (lub standardowego `pip`).
+- **🎯 Provenance-Aware Taste Profiling**: Analyzes your watch history, ratings, and directorial affinities. Automatically versions profiles (`v1.0-gemini`, `v2.0-gemini`) with provenance timestamps and supports manual fine-tuning (`v1.1-manual`).
+- **🛡️ Strict Anti-Recommendation Filtering**: Never recommends titles you have already watched, currently have on *Plan to Watch*, or previously rejected/hidden. Respects negative genre biases (e.g. anti-animation filters).
+- **⚖️ Hybrid Discovery & Scoring**: Combines rule-based TMDB discovery (40% favorites similarity, 35% genre preferences, 15% preferred creators, 10% curated exploration) with structured semantic LLM evaluation (match score, confidence, positive signals, and risks).
+- **🎬 Integrated Trailer Player**: Automatically resolves official high-quality YouTube trailers via TMDB Videos, embedded in a responsive 16:9 player (`youtube-nocookie.com`) or fallback search.
+- **🔒 Human-in-the-Loop Simkl Sync**: **Zero writes without explicit approval**. Recommendations must be explicitly accepted (`accept`) before you can batch-sync them to your Simkl *Plan to Watch* list. All operations are strictly idempotent.
+- **🤖 Dual-Mode MCP Server**:
+  - **STDIO**: Seamless local agent integration for Antigravity, Claude Desktop, and Cursor.
+  - **Streamable HTTP / SSE**: Secure endpoint for remote AI agents (such as ChatGPT Custom GPTs) protected by Bearer token authentication.
+- **⚡ Homelab-Ready Architecture**: Runs on FastAPI, SQLAlchemy 2.0, and SQLite configured with **Write-Ahead Logging (WAL)** and busy timeouts for concurrent, collision-free 24/7 background scheduling.
 
-```bash
-# 1. Klonowanie i wejście do katalogu
-git clone <repo_url>
-cd movie-recommend
+---
 
-# 2. Utworzenie środowiska wirtualnego i instalacja zależności
-uv sync
-# lub: python -m venv .venv && source .venv/bin/activate && pip install -e .
+## 🏗️ Architecture Overview
+
+```
+                 ┌──────────────────────────────────────────────────┐
+                 │                   Clients                        │
+                 │   Web SPA (Vanilla JS)  │  Antigravity / Cursor  │  ChatGPT (SSE)
+                 └─────────────┬───────────┴───────────┬────────────┴───────┬──────┘
+                               │ HTTP / REST           │ STDIO MCP          │ SSE MCP
+                               ▼                       ▼                    ▼
+                 ┌─────────────────────────────────────────────────────────────────┐
+                 │                    Curato FastAPI Backend                       │
+                 │                                                                 │
+                 │   [ REST API /api/v1 ]         [ MCP Server & Tools ]           │
+                 │   [ Static SPA Files ]         [ Async Background Scheduler ]   │
+                 │                                                                 │
+                 │   Domain Services:                                              │
+                 │     • SyncService         (Simkl history & ratings)             │
+                 │     • TasteService        (LLM profiling & versioning)          │
+                 │     • DiscoveryService    (TMDB multi-strategy candidates)      │
+                 │     • RecommendationEngine(Anti-filter, scoring & diversity)    │
+                 │     • WatchlistService    (Controlled, idempotent Simkl export) │
+                 └──────────────────────────────┬──────────────────────────────────┘
+                                                │
+                     ┌──────────────────────────┼──────────────────────────┐
+                     ▼                          ▼                          ▼
+            [ SQLite (WAL Mode) ]      [ External APIs ]          [ External APIs ]
+            • media_items              • Simkl API (OAuth 2.0)    • Google Gemini /
+            • watch_history            • TMDB API (v3/v4)           OpenAI API
+            • taste_profiles
+            • recommendations
+            • user_decisions
 ```
 
 ---
 
-## 2. Konfiguracja zmiennych środowiskowych
+## 🚀 Quickstart with Docker Compose
 
-Skopiuj plik `.env.example` do `.env` i uzupełnij klucze API:
+Curato is packaged for instant deployment using Docker Compose:
 
-```bash
-cp .env.example .env
-```
+1. **Clone the repository:**
+   ```bash
+   git clone git@github.com:vibowit/curato.git
+   cd curato
+   ```
 
-Wymagane klucze w `.env`:
-- `SIMKL_CLIENT_ID` i `SIMKL_CLIENT_SECRET`: z [Simkl Developer Portal](https://simkl.com/settings/developer/).
-- `SIMKL_USER_TOKEN`: token autoryzacyjny użytkownika (można wygenerować asystentem `python scripts/get_simkl_token.py`).
-- `TMDB_API_KEY`: klucz API z [The Movie Database](https://www.themoviedb.org/settings/api).
-- `GEMINI_API_KEY`: klucz API z [Google AI Studio](https://aistudio.google.com/).
-- Opcjonalnie: `MCP_API_KEY` (ochrona transportu SSE dla zdalnych asystentów), `SCHEDULER_ENABLED=true` (włączenie cotygodniowego joba w tle).
+2. **Configure your environment variables:**
+   ```bash
+   cp .env.example .env
+   # Edit .env and supply your API keys (see Configuration below)
+   ```
+
+3. **Ensure the data volume directory has appropriate permissions (UID 1000):**
+   ```bash
+   mkdir -p data
+   # On Linux/Proxmox: sudo chown -R 1000:1000 data && sudo chmod 775 data
+   ```
+
+4. **Start the service:**
+   ```bash
+   docker compose up -d --build
+   ```
+
+5. Open your browser:
+   - **Review Dashboard**: [http://localhost:8000/](http://localhost:8000/)
+   - **API Docs (Swagger UI)**: [http://localhost:8000/docs](http://localhost:8000/docs)
+   - **Healthcheck**: [http://localhost:8000/api/health](http://localhost:8000/api/health)
 
 ---
 
-## 3. Inicjalizacja bazy danych i uruchomienie
+## ⚙️ Configuration (`.env`)
 
-```bash
-# 1. Migracje bazy SQLite (Alembic)
-.venv/bin/alembic upgrade head
+Copy `.env.example` to `.env` and configure:
 
-# 2. Uruchomienie serwera FastAPI
-.venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload
-```
-
-Po uruchomieniu przejdź do:
-- **Panel przeglądu i decyzji:** [http://localhost:8000/](http://localhost:8000/)
-- **Swagger UI:** [http://localhost:8000/docs](http://localhost:8000/docs)
-- **Status aplikacji:** [http://localhost:8000/api/health](http://localhost:8000/api/health)
+| Variable | Description | Required |
+| :--- | :--- | :---: |
+| `SIMKL_CLIENT_ID` | Simkl Developer Client ID ([Simkl Developer](https://simkl.com/settings/developer/)) | **Yes** |
+| `SIMKL_CLIENT_SECRET` | Simkl Developer Client Secret | **Yes** |
+| `SIMKL_USER_TOKEN` | Simkl User Access Token (obtainable via `python scripts/get_simkl_token.py`) | **Yes** |
+| `TMDB_API_KEY` | The Movie Database API Key v3 ([TMDB Settings](https://www.themoviedb.org/settings/api)) | **Yes** |
+| `GEMINI_API_KEY` | Google Gemini API Key ([Google AI Studio](https://aistudio.google.com/)) | **Yes** |
+| `GEMINI_MODEL` | Preferred Gemini model (default: `gemini-2.5-flash`) | No |
+| `MCP_API_KEY` | Shared secret token protecting remote `/mcp/sse` endpoints | Recommended |
+| `SCHEDULER_ENABLED` | Enables weekly automated background sync and recommendation generation | No (default: `true`) |
+| `SQLITE_DB_PATH` | Path to SQLite database file (default: `/app/data/movie_recommend.db`) | No |
 
 ---
 
-## 4. Konfiguracja serwera MCP
+## 🤖 Model Context Protocol (MCP) Integration
 
-### A. Antigravity IDE / CLI (STDIO)
-W pliku konfiguracyjnym Antigravity (`~/.gemini/settings.json`):
+Curato exposes 9 domain tools to AI agents:
+
+- `get_taste_profile()`: Current active taste profile (genres, motifs, directors, anti-preferences).
+- `get_library_stats()`: Synchronized library counters and sync timestamps.
+- `sync_simkl(full_sync)`: Trigger on-demand sync from Simkl.
+- `generate_recommendations(movie_limit, show_limit)`: Run the recommendation pipeline.
+- `get_recommendations(run_id)`: Retrieve candidates with scores, reasoning, and trailer URLs.
+- `get_trailer(recommendation_id)`: Fetch official YouTube trailer details.
+- `record_decision(recommendation_id, decision, note)`: Register user choice (`accept`, `reject`, `seen`, `later`).
+- `approve_recommendations(recommendation_ids)`: Safely export approved items to Simkl *Plan to Watch*.
+- `get_recommendation_history(limit)`: History of past runs and editions.
+
+### Antigravity IDE / Cursor / Claude Desktop (STDIO)
+Add to your client configuration (e.g. `~/.gemini/settings.json`):
 
 ```json
 {
   "mcpServers": {
-    "movie-recommender": {
-      "command": "/pełna/ścieżka/do/movie-recommend/.venv/bin/python",
+    "curato": {
+      "command": "/path/to/curato/.venv/bin/python",
       "args": ["-m", "app.mcp.cli"],
-      "cwd": "/pełna/ścieżka/do/movie-recommend"
+      "cwd": "/path/to/curato"
     }
   }
 }
 ```
 
-Dostępne narzędzia MCP:
-- `get_taste_profile()` – pobiera aktualny profil gustu (gatunki, motywy, reżyserzy, antypreferencje).
-- `get_library_stats()` – statystyki lokalnej bazy (filmy, seriale, oceny, czas synchronizacji).
-- `sync_simkl(full_sync)` – uruchamia synchronizację z Simkl.
-- `generate_recommendations(movie_limit, show_limit)` – generuje nową edycję.
-- `get_recommendations(run_id)` – pobiera listę propozycji z uzasadnieniami.
-- `record_decision(recommendation_id, decision, note)` – rejestruje decyzję użytkownika (`accept`, `reject`, `seen`, `later`).
-- `approve_recommendations(recommendation_ids)` – **bezpieczny, idempotentny zapis wyłącznie zaakceptowanych pozycji** do Simkl Plan to Watch.
-- `get_recommendation_history(limit)` – historia przebiegów i edycji.
-
-### B. ChatGPT (Streamable HTTP / SSE)
-- **Endpoint SSE:** `https://twoja-domena.pl/mcp/sse`
-- **Wiadomości:** `https://twoja-domena.pl/mcp/messages/`
-- **Autoryzacja:** Bearer Token (`MCP_API_KEY`)
+### ChatGPT / Remote Assistant (SSE)
+- **SSE Endpoint**: `https://your-domain.com/mcp/sse`
+- **Messages Endpoint**: `https://your-domain.com/mcp/messages/`
+- **Authentication**: Bearer header with your `MCP_API_KEY`
 
 ---
 
-## 5. Testy automatyczne i jakość kodu
+## 🛠️ Local Development
+
+Curato uses [`uv`](https://github.com/astral-sh/uv) for fast, reproducible dependency management.
 
 ```bash
-# Uruchomienie pełnego pakietu 103 testów
-.venv/bin/pytest
+# 1. Install dependencies
+uv sync
 
-# Weryfikacja formatowania i lintera
-.venv/bin/ruff check app tests
+# 2. Apply database migrations
+uv run alembic upgrade head
+
+# 3. Start development server with hot-reload
+uv run uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload
+
+# 4. Run full test suite (108 tests)
+uv run pytest
+
+# 5. Run linter
+uv run ruff check app tests
 ```
+
+---
+
+## 📄 License & Showcase Notice
+
+This project is licensed under the **[MIT License](LICENSE)**.
+
+Curato is a personal portfolio project. Issues and Pull Requests are disabled. You are welcome to fork and adapt it for your own homelab setup.
