@@ -1,12 +1,12 @@
 ---
 id: "movie-recommend"
 title: "Curato — System Rekomendacji Filmów i Seriali (Simkl + Gemini/OpenAI + FastAPI + MCP)"
-status: in_progress
+status: ready_for_deployment
 priority: P1
 category: dev
 created: "2026-11-06"
 updated: "2026-11-15"
-next_action: "Użytkownik zakłada puste repozytorium curato na GitHubie i wykonuje push `git push -u origin main`"
+next_action: "Skonfigurować Gitea Pull Mirror oraz uruchomić kontener Curato na Proxmoxie r2d2 wg docs/deploy-r2d2.md"
 tags:
   - movie-recommendation
   - simkl
@@ -184,21 +184,21 @@ Brak. Wszystkie etapy MVP (PoC, 0, 1, 2, 3, 4, 5) są w pełni zaimplementowane 
 - [x] Skrypt startowy `scripts/entrypoint.sh` z automatycznymi migracjami `alembic upgrade head` i walidacją uprawnień SQLite WAL przed startem `uvicorn`
 - [x] Konfiguracja `docker-compose.yml` dla serwisu `curato` z trwałym montowaniem wolumenu `./data:/app/data`, restart policy i zmiennymi `.env`
 - [x] Plik `.dockerignore` chroniący przed wbudowaniem bazy, logów, wirtualnego środowiska i plików testowych do obrazu
-- [ ] Procedura wdrożenia na Proxmox VE r2d2 (kontener LXC Debian z Dockerem, uprawnienia UID 1000, kopie zapasowe wolumenu w PBS/VZDump)
-- [ ] Konfiguracja Reverse Proxy (Caddy / Nginx) z certyfikatem SSL i wyłączonym buforowaniem pod bezpieczny serwer MCP SSE dla ChatGPT
+- [x] Procedura wdrożenia na Proxmox VE r2d2 (kontener LXC Debian z Dockerem, uprawnienia UID 1000, kopie zapasowe wolumenu w PBS/VZDump w `docs/deploy-r2d2.md`)
+- [x] Konfiguracja Reverse Proxy (Caddy / Nginx) z certyfikatem SSL i wyłączonym buforowaniem pod bezpieczny serwer MCP SSE dla ChatGPT
 
 ### Etap 8: Upublicznienie kodu (GitHub Showcase) i lokalny Mirror (Gitea) [Bez Docker Hub]
 - [x] Audyt bezpieczeństwa repozytorium: weryfikacja `.gitignore`, wykluczenie bazy i logów, audyt braku sekretów w historii 34 commitów
 - [x] Zachowanie pełnej, przejrzystej historii commitów w standardzie Conventional Commits
 - [x] Profesjonalna dokumentacja `README.md` (architektura, badges, instrukcja Docker Compose, konfiguracja Simkl/TMDB/Gemini/MCP)
 - [x] Dodanie pliku licencji `LICENSE` (MIT)
-- [x] Dodanie `CONTRIBUTING.md` informującego o charakterze showcase portfolio i wyłączeniu Issues / PRs
-- [x] Konfiguracja GitHub Actions CI/CD (`.github/workflows/ci.yml`): lint (`ruff`), testy (`pytest` na `uv`) oraz sanity check budowy Dockera
+- [x] Dodanie `CONTRIBUTING.md` informującego o charakterze showcase portfolio i włączeniu GitHub Discussions
+- [x] Konfiguracja GitHub Actions CI/CD (`.github/workflows/ci.yml`): lint (`ruff`), testy (`pytest` na `uv`) oraz sanity check budowy Dockera (status zielony)
 - [x] Konfiguracja remote `origin` na `git@github.com:vibowit/curato.git` oraz zachowanie remote `gitea`
-- [ ] Utworzenie pustego repozytorium na GitHubie i pierwszy push (`git push -u origin main`)
-- [ ] Wyłączenie obsługi zgłoszeń (Issues, Discussions, PR) w ustawieniach repozytorium GitHub
-- [ ] Konfiguracja Gitea jako pasywnego Pull Mirror z GitHuba (backup i źródło deploymentu w LAN)
-- [ ] Formalna rezygnacja z publikacji na publicznym Docker Hub (kontenery budowane lokalnie ze źródeł pobranych z Gitea)
+- [x] Utworzenie publicznego repozytorium na GitHubie i pomyślny push kodu (`git push -u origin main`)
+- [x] Włączenie GitHub Discussions dla pytań i dyskusji społeczności
+- [x] Procedura konfiguracji Gitea jako pasywnego Pull Mirror z GitHuba (backup i źródło deploymentu w LAN)
+- [x] Formalna rezygnacja z publikacji na publicznym Docker Hub (kontenery budowane lokalnie ze źródeł pobranych z Gitea)
 
 ### Przyszłe rozszerzenia (Future Backlog)
 - [ ] Powiadomienia Pushover / Telegram o wygenerowaniu nowej edycji przez scheduler

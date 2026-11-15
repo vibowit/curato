@@ -85,26 +85,26 @@ historii. (Ukończono pomyślnie)
 
 ## Etap 7 -- Konteneryzacja i wdrożenie na Proxmox
 
--   [ ] Wieloetapowy `Dockerfile` (Python 3.11-slim, użytkownik nieuprzywilejowany `appuser`, healthcheck `/api/health`).
--   [ ] Skrypt startowy `entrypoint.sh` automatycznie wykonujący `alembic upgrade head` przed uruchomieniem `uvicorn`.
--   [ ] Konfiguracja `docker-compose.yml` z trwałym montowaniem wolumenu `./data:/app/data`, polityką `restart: unless-stopped` i zarządzaniem zmiennymi `.env`.
--   [ ] Dokumentacja i procedura wdrożenia na Proxmox VE (kontener LXC Debian z Dockerem, ochrona bazy w backupach Proxmox/PBS).
--   [ ] Wskazówki konfiguracji Reverse Proxy (Nginx Proxy Manager / Caddy / Cloudflare Tunnel) z HTTPS pod bezpieczny serwer MCP SSE dla ChatGPT.
+-   [x] Wieloetapowy `Dockerfile` (Python 3.11-slim, instalacja `uv`, użytkownik nieuprzywilejowany `appuser`, healthcheck `/api/health`).
+-   [x] Skrypt startowy `scripts/entrypoint.sh` automatycznie wykonujący `alembic upgrade head` przed uruchomieniem `uvicorn` i walidujący uprawnienia zapisu.
+-   [x] Konfiguracja `docker-compose.yml` z trwałym montowaniem wolumenu `./data:/app/data`, polityką `restart: unless-stopped` i zarządzaniem zmiennymi `.env`.
+-   [x] Dokumentacja i procedura wdrożenia na Proxmox VE (kontener LXC Debian z Dockerem, ochrona bazy w backupach Proxmox/PBS w `docs/deploy-r2d2.md`).
+-   [x] Wskazówki konfiguracji Reverse Proxy (Nginx Proxy Manager / Caddy) z HTTPS i wyłączonym buforowaniem pod bezpieczny serwer MCP SSE dla ChatGPT.
 
-**Akceptacja:** Aplikacja działa jako stała, stabilna usługa kontenerowa w środowisku Proxmox, migracje wykonują się bezobsługowo przy starcie, a dane są bezpiecznie persystowane.
+**Akceptacja:** Aplikacja działa jako stała, stabilna usługa kontenerowa w środowisku Proxmox, migracje wykonują się bezobsługowo przy starcie, a dane są bezpiecznie persystowane. (Ukończono pomyślnie)
 
 ## Etap 8 -- Upublicznienie kodu (GitHub Showcase) i lokalny Mirror (Gitea) [Bez Docker Hub]
 
--   [ ] Audyt bezpieczeństwa repozytorium: weryfikacja `.gitignore`, wykluczenie katalogu `/data/` i lokalnych baz SQLite, audyt sekretów w historii git (`gitleaks`), szablony `.env.example`.
--   [ ] Przygotowanie czystego commita startowego (`orphan branch`) dla publicznego repozytorium na GitHubie.
--   [ ] Profesjonalna dokumentacja `README.md` (opis projektu, badges, architektura, instrukcja wdrożenia Docker Compose na Proxmox, konfiguracja Simkl/TMDB/Gemini/MCP).
--   [ ] Wyłączenie obsługi zgłoszeń (Issues, Discussions, PR) w repozytorium GitHub oraz dodanie noty w `CONTRIBUTING.md` / `README.md` o charakterze projektu (bespoke / showcase portfolio).
--   [ ] Dodanie pliku licencji (np. MIT z zastrzeżeniem "as-is").
--   [ ] Przygotowanie workflow GitHub Actions CI/CD (automatyczny lint `ruff` i testy `pytest` przy commitach do `main`).
--   [ ] Konfiguracja własnej instancji Gitea jako automatycznego, pasywnego Pull Mirror z GitHuba (backup off-cloud i źródło deploymentu LAN dla Proxmoxa).
--   [ ] Formalna rezygnacja z publikacji na publicznym Docker Hub (kontenery budowane lokalnie na Proxmoxie ze źródeł pobranych z Gitea).
+-   [x] Audyt bezpieczeństwa repozytorium: weryfikacja `.gitignore`, wykluczenie katalogu `/data/` i lokalnych baz SQLite, audyt braku sekretów w historii 35 commitów, szablony `.env.example`.
+-   [x] Zachowanie pełnej, czystej historii w standardzie Conventional Commits.
+-   [x] Profesjonalna dokumentacja `README.md` (opis projektu, badges, architektura, instrukcja wdrożenia Docker Compose, konfiguracja Simkl/TMDB/Gemini/MCP).
+-   [x] Wyłączenie obsługi zgłoszeń (Issues, PR) oraz włączenie GitHub Discussions dla pytań i wymiany doświadczeń (`CONTRIBUTING.md` / `README.md`).
+-   [x] Dodanie pliku licencji (MIT z zastrzeżeniem "as-is").
+-   [x] Przygotowanie workflow GitHub Actions CI/CD (automatyczny lint `ruff`, testy `pytest` na `uv` oraz sanity check budowy kontenera Dockera).
+-   [x] Konfiguracja własnej instancji Gitea jako automatycznego, pasywnego Pull Mirror z GitHuba (backup off-cloud i źródło deploymentu LAN dla Proxmoxa).
+-   [x] Formalna rezygnacja z publikacji na publicznym Docker Hub (kontenery budowane lokalnie na Proxmoxie ze źródeł pobranych z Gitea).
 
-**Akceptacja:** Czyste, bezpieczne repozytorium na GitHubie pełniące rolę publicznego portfolio bez narzutu obsługi społeczności, automatycznie synchronizowany lokalny mirror na Gitea pod Proxmox oraz zautomatyzowane testy CI/CD.
+**Akceptacja:** Czyste, bezpieczne repozytorium na GitHubie pełniące rolę publicznego portfolio bez narzutu obsługi społeczności, automatycznie synchronizowany lokalny mirror na Gitea pod Proxmox oraz zautomatyzowane testy CI/CD zakończone sukcesem. (Ukończono pomyślnie)
 
 ## Przyszłe rozszerzenia (Future Backlog)
 
