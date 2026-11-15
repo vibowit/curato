@@ -216,7 +216,12 @@ document.addEventListener("DOMContentLoaded", () => {
       .map((f) => `<span class="factor-tag factor-positive">✓ ${f}</span>`)
       .join("");
 
-    const risksHtml = (rec.risks || [])
+    const allRisks = [...(rec.risks || [])];
+    if (isLowConfidence) {
+      allRisks.unshift("Ograniczone metadane w bazie dla tego tytułu");
+    }
+
+    const risksHtml = allRisks
       .map((r) => `<span class="factor-tag factor-risk">⚠ ${r}</span>`)
       .join("");
 
@@ -237,9 +242,8 @@ document.addEventListener("DOMContentLoaded", () => {
           <span class="card-year">${year}</span>
         </div>
         <div class="card-match-bar">
-          <span class="match-score-badge" title="Dopasowanie do profilu gustu">${matchPercent}% dopasowania</span>
-          ${tmdbRating ? `<span class="rating-badge" title="Ocena społeczności TMDB">★ ${tmdbRating}</span>` : ""}
-          ${isLowConfidence ? `<span class="warning-badge" title="Ograniczone metadane w bazie dla tego tytułu">⚠️ Mało danych</span>` : ""}
+          <span class="match-score-badge" title="Dopasowanie do profilu gustu: ${matchPercent}%">${matchPercent}%</span>
+          ${tmdbRating ? `<span class="rating-badge" title="Średnia ocen społeczności TMDB">★ ${tmdbRating}</span>` : ""}
           <button class="btn-card-trailer" data-action="trailer" data-id="${rec.id}" title="Obejrzyj oficjalny zwiastun">
             🎬 Zwiastun
           </button>
