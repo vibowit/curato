@@ -6,7 +6,7 @@ priority: P1
 category: dev
 created: "2026-11-06"
 updated: "2026-11-15"
-next_action: "Skonsultować z użytkownikiem rozpoczęcie Kroku 2: Przygotowanie repozytorium GitHub (Curato), GitHub Actions CI/CD i Gitea mirror"
+next_action: "Użytkownik zakłada puste repozytorium curato na GitHubie i wykonuje push `git push -u origin main`"
 tags:
   - movie-recommendation
   - simkl
@@ -188,14 +188,17 @@ Brak. Wszystkie etapy MVP (PoC, 0, 1, 2, 3, 4, 5) są w pełni zaimplementowane 
 - [ ] Konfiguracja Reverse Proxy (Caddy / Nginx) z certyfikatem SSL i wyłączonym buforowaniem pod bezpieczny serwer MCP SSE dla ChatGPT
 
 ### Etap 8: Upublicznienie kodu (GitHub Showcase) i lokalny Mirror (Gitea) [Bez Docker Hub]
-- [ ] Audyt bezpieczeństwa repozytorium: weryfikacja `.gitignore`, wykluczenie katalogu `/data/` i bazy SQLite, skanowanie historii git (`gitleaks`), szablon `.env.example`
-- [ ] Przygotowanie czystego commita startowego (`orphan branch`) dla publicznego repozytorium na GitHubie
-- [ ] Profesjonalna dokumentacja `README.md` (architektura, badges, instrukcja wdrożenia na Proxmox, konfiguracja Simkl/TMDB/Gemini/MCP)
-- [ ] Wyłączenie obsługi zgłoszeń (Issues, Discussions, PR) w repozytorium GitHub oraz dodanie noty w `CONTRIBUTING.md` / `README.md` (projekt bespoke / portfolio)
-- [ ] Dodanie pliku licencji (np. MIT z klauzulą as-is)
-- [ ] Konfiguracja GitHub Actions CI/CD: automatyczny lint (`ruff`) i testy (`pytest`) przy commitach do `main`
-- [ ] Konfiguracja własnej instancji Gitea jako automatycznego, pasywnego Pull Mirror z GitHuba (backup i źródło deploymentu w LAN)
-- [ ] Formalna rezygnacja z publikacji na publicznym Docker Hub (kontenery budowane lokalnie na Proxmoxie ze źródeł pobranych z Gitea)
+- [x] Audyt bezpieczeństwa repozytorium: weryfikacja `.gitignore`, wykluczenie bazy i logów, audyt braku sekretów w historii 34 commitów
+- [x] Zachowanie pełnej, przejrzystej historii commitów w standardzie Conventional Commits
+- [x] Profesjonalna dokumentacja `README.md` (architektura, badges, instrukcja Docker Compose, konfiguracja Simkl/TMDB/Gemini/MCP)
+- [x] Dodanie pliku licencji `LICENSE` (MIT)
+- [x] Dodanie `CONTRIBUTING.md` informującego o charakterze showcase portfolio i wyłączeniu Issues / PRs
+- [x] Konfiguracja GitHub Actions CI/CD (`.github/workflows/ci.yml`): lint (`ruff`), testy (`pytest` na `uv`) oraz sanity check budowy Dockera
+- [x] Konfiguracja remote `origin` na `git@github.com:vibowit/curato.git` oraz zachowanie remote `gitea`
+- [ ] Utworzenie pustego repozytorium na GitHubie i pierwszy push (`git push -u origin main`)
+- [ ] Wyłączenie obsługi zgłoszeń (Issues, Discussions, PR) w ustawieniach repozytorium GitHub
+- [ ] Konfiguracja Gitea jako pasywnego Pull Mirror z GitHuba (backup i źródło deploymentu w LAN)
+- [ ] Formalna rezygnacja z publikacji na publicznym Docker Hub (kontenery budowane lokalnie ze źródeł pobranych z Gitea)
 
 ### Przyszłe rozszerzenia (Future Backlog)
 - [ ] Powiadomienia Pushover / Telegram o wygenerowaniu nowej edycji przez scheduler
