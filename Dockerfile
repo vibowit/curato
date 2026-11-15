@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 FROM python:3.11-slim AS builder
 
-WORKDIR /build
+WORKDIR /app
 
 # Pobranie oficjalnego binarium uv
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /bin/uv
@@ -27,7 +27,7 @@ RUN groupadd -g 1000 appuser && \
     chown -R appuser:appuser /app
 
 # Kopiowanie virtualenv z buildera
-COPY --from=builder --chown=appuser:appuser /build/.venv /app/.venv
+COPY --from=builder --chown=appuser:appuser /app/.venv /app/.venv
 
 # Kopiowanie aplikacji, migracji i zasobów
 COPY --chown=appuser:appuser app /app/app

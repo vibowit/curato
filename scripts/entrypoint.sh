@@ -13,7 +13,7 @@ fi
 
 # Automatyczna migracja schematu bazy danych
 echo "[entrypoint] Wykonywanie migracji bazy danych Alembic..."
-alembic upgrade head
+python -m alembic upgrade head
 echo "[entrypoint] Migracje zakończone pomyślnie."
 
 # Uruchomienie aplikacji przekazanej w CMD
