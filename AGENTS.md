@@ -3,9 +3,9 @@
 ## Cel projektu
 
 Budujesz prywatny system rekomendacji filmów i seriali oparty na Simkl.
-Przed większą zmianą przeczytaj kluczowe dokumenty projektowe:
-`PRODUCT.md`, `ARCHITECTURE.md`, `DATA_MODEL.md`, `API_CONTRACTS.md`,
-`RECOMMENDATION_ENGINE.md`, `ROADMAP.md` oraz `docs/ADR.md`.
+Przed większą zmianą przeczytaj kluczowe dokumenty projektowe w `docs/`:
+`docs/product.md`, `docs/architecture.md`, `docs/data-model.md`, `docs/api-contracts.md`,
+`docs/recommendation-engine.md`, `docs/ADR.md` oraz `ROADMAP.md`.
 
 ## Nienegocjowalne zasady
 

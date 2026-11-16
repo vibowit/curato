@@ -2,7 +2,7 @@
 name = "curato"
 version = "0.1.0"
 description = "Curato: Personal movie and TV show recommendation system based on Simkl, taste profiling, and LLM"
-readme = "PRODUCT.md"
+readme = "README.md"
 requires-python = ">=3.11"
 authors = [
     { name = "vibowit" }

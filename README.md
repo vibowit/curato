@@ -195,6 +195,20 @@ uv run ruff check app tests
 
 ---
 
+## Documentation
+
+Comprehensive project specifications, architecture design, and deployment guides:
+
+- [Architecture & Design Principles](docs/architecture.md)
+- [Product Scope & Requirements](docs/product.md)
+- [Data Model & Database Schema](docs/data-model.md)
+- [API Contracts & Error Format](docs/api-contracts.md)
+- [Recommendation Engine Specification](docs/recommendation-engine.md)
+- [Docker & Proxmox VE (LXC) Deployment Guide](docs/deployment.md)
+- [Architecture Decision Records (ADR)](docs/ADR.md)
+
+---
+
 ## License & Discussions
 
 Curato is open source under the [MIT License](LICENSE).
