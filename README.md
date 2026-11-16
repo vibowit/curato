@@ -22,6 +22,24 @@ Most movie pickers treat recommendations as a generic popularity contest. **Cura
 
 ---
 
+## Preview
+
+### Recommendation Review & Decision Deck
+Review weekly candidates scored against your taste profile, complete with tailored LLM reasoning, matching motifs, and integrated YouTube trailers:
+
+<p align="center">
+  <img src="docs/assets/dashboard-recommendations.png" alt="Curato Recommendation Dashboard" width="100%" />
+</p>
+
+### Versioned Taste Profiling
+Natural-language taste analysis, thematic motifs, weighted genres, and director preferences synthesized from your Simkl watch history:
+
+<p align="center">
+  <img src="docs/assets/taste-profile-modal.png" alt="Curato Taste Profile Modal" width="85%" />
+</p>
+
+---
+
 ## Architecture and Design Principles
 
 - **Taste profiling with provenance**: Watch history and ratings are aggregated from Simkl into versioned taste profiles (e.g., `v1.0-gemini`). Profiles capture thematic motifs, directorial preferences, and anti-preferences, while supporting manual adjustments (`v1.1-manual`) without losing provenance data.
