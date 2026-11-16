@@ -13,7 +13,7 @@ wymiennymi klientami przez MCP; nie zawierają własnej logiki domenowej.
 -   **Simkl adapter** -- OAuth, odczyt biblioteki/list, zapis
     zatwierdzonych tytułów.
 -   **TMDB adapter** -- wyszukiwanie kandydatów i metadane.
--   **LLM adapter** -- wspólny interfejs do Gemini i OpenAI.
+-   **LLM adapter** -- protokół `LLMProvider` i moduł adaptera z zaimplementowanym klientem Gemini (`GeminiLLMClient`), przygotowany pod kolejnych dostawców (np. OpenAI).
 -   **Recommendation service** -- filtracja, ranking, dywersyfikacja.
 -   **MCP server** -- cienka warstwa narzędzi wywołująca te same
     serwisy.

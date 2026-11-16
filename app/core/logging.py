@@ -14,7 +14,6 @@ class RedactingFilter(logging.Filter):
                 settings.SIMKL_ACCESS_TOKEN,
                 settings.SIMKL_CLIENT_SECRET,
                 settings.GEMINI_API_KEY,
-                settings.OPENAI_API_KEY,
                 settings.TMDB_API_KEY,
                 settings.TMDB_READ_ACCESS_TOKEN,
             ]:

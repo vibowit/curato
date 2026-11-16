@@ -4,7 +4,7 @@
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-Curato is a self-hosted movie and TV show recommendation service designed for personal homelab environments. It learns from your watch history and ratings on **Simkl**, sources discovery candidates from **TMDB**, and uses LLMs (**Google Gemini** or **OpenAI**) to perform semantic scoring, risk assessment, and reasoning.
+Curato is a self-hosted movie and TV show recommendation service designed for personal homelab environments. It learns from your watch history and ratings on **Simkl**, sources discovery candidates from **TMDB**, and uses LLMs (**Google Gemini**) to perform semantic scoring, risk assessment, and reasoning.
 
 Recommendations can be reviewed through a lightweight single-page web dashboard or queried by AI assistants using the **Model Context Protocol (MCP)**.
 
@@ -73,7 +73,7 @@ Natural-language taste analysis, thematic motifs, weighted genres, and director 
                                                |
                      +-------------------------+------------------------+
                      v                         v                        v
-            [ SQLite (WAL Mode) ]     [ Simkl API (OAuth) ]    [ Google Gemini / OpenAI ]
+            [ SQLite (WAL Mode) ]     [ Simkl API (OAuth) ]    [ Google Gemini ]
             Local state & runs        History & Watchlist      Semantic scoring & taste
 ```
 
@@ -92,7 +92,7 @@ The recommended way to run Curato is using Docker Compose:
 2. **Configure environment variables:**
    ```bash
    cp .env.example .env
-   # Edit .env with your Simkl, TMDB, and Gemini/OpenAI API credentials
+   # Edit .env with your Simkl, TMDB, and Gemini API credentials
    ```
 
 3. **Prepare the data directory (UID 1000):**
@@ -130,7 +130,7 @@ Settings are managed via environment variables (or `.env` file):
 | `GEMINI_API_KEY` | Google Gemini API Key | Required |
 | `GEMINI_MODEL` | Target Gemini model | `gemini-2.5-flash` |
 | `MCP_API_KEY` | Bearer token protecting `/mcp/sse` endpoints | Optional (recommended) |
-| `SCHEDULER_ENABLED` | Run weekly automated recommendations in the background | `true` |
+| `SCHEDULER_ENABLED` | Run weekly automated recommendations in the background | `false` |
 | `SQLITE_DB_PATH` | Path to the SQLite database file | `/app/data/movie_recommend.db` |
 | `LOG_LEVEL` | Application logging verbosity | `INFO` |
 

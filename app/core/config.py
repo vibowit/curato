@@ -29,10 +29,9 @@ class Settings(BaseSettings):
         """Returns SIMKL_USER_TOKEN if set, otherwise SIMKL_ACCESS_TOKEN."""
         return self.SIMKL_USER_TOKEN or self.SIMKL_ACCESS_TOKEN
 
-    # LLM Providers
+    # LLM Provider (Google Gemini)
     GEMINI_API_KEY: SecretStr | None = None
     GEMINI_MODEL: str | None = None
-    OPENAI_API_KEY: SecretStr | None = None
 
     # TMDB Integration
     TMDB_API_KEY: SecretStr | None = None
