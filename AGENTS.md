@@ -20,6 +20,9 @@ Przed większą zmianą przeczytaj kluczowe dokumenty projektowe w `docs/`:
     bez uzasadnienia i decyzji użytkownika.
 -   Strategia repozytorium i publikacji:
     -   GitHub jest jedynym kanonicznym źródłem prawdy (`origin`), udostępnianym publicznie jako portfolio/showcase bez obsługi zgłoszeń (Issues i PRs wyłączone).
+    -   Brak sztucznych PR-ów: nie twórz PR-ów tylko po to, by mieć je w historii.
+    -   Pracuj na gałęzi `main` przy drobnych poprawkach; używaj gałęzi i PR-ów przy większych funkcjach.
+    -   GitHub Release twórz po sprawdzonym, sensownym zestawie zmian.
     -   Własna instancja Gitea działa wyłącznie jako w 100% pasywny mirror (Pull Mirror) pod backup i deployment w sieci LAN (Proxmox).
     -   Rezygnacja z publikacji na Docker Hub; obrazy budowane są lokalnie na serwerze docelowym (lub GHCR).
 
@@ -76,3 +79,8 @@ Przed większą zmianą przeczytaj kluczowe dokumenty projektowe w `docs/`:
 3.  Nie rozszerzaj zakresu samodzielnie.
 4.  Po zmianie uruchom odpowiednie testy i podsumuj wynik oraz pozostałe ryzyka.
 5.  Przygotowuj logiczne commity w standardzie Conventional Commits (np. `feat(auth): ...`, `docs(deployment): ...`).
+6.  Zarządzanie gałęziami i wydaniami:
+    -   Nie twórz PR-ów tylko po to, by mieć je w historii.
+    -   Pracuj bezpośrednio na `main` przy drobnych poprawkach.
+    -   Używaj gałęzi i PR wyłącznie przy większych funkcjach.
+    -   GitHub Release twórz po sprawdzonym, sensownym zestawie zmian.
