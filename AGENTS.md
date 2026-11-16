@@ -3,9 +3,9 @@
 ## Cel projektu
 
 Budujesz prywatny system rekomendacji filmów i seriali oparty na Simkl.
-Przeczytaj `PRODUCT.md`, `ARCHITECTURE.md`, `DATA_MODEL.md`,
-`API_CONTRACTS.md`, `RECOMMENDATION_ENGINE.md` i `ROADMAP.md` przed
-większą zmianą.
+Przed większą zmianą przeczytaj kluczowe dokumenty projektowe:
+`PRODUCT.md`, `ARCHITECTURE.md`, `DATA_MODEL.md`, `API_CONTRACTS.md`,
+`RECOMMENDATION_ENGINE.md`, `ROADMAP.md` oraz `docs/ADR.md`.
 
 ## Nienegocjowalne zasady
 
@@ -23,6 +23,10 @@ większą zmianą.
     -   Własna instancja Gitea działa wyłącznie jako w 100% pasywny mirror (Pull Mirror) pod backup i deployment w sieci LAN (Proxmox).
     -   Rezygnacja z publikacji na Docker Hub; obrazy budowane są lokalnie na serwerze docelowym (lub GHCR).
 
+## Wdrażanie i Docker (Proxmox LXC & SQLite WAL)
+
+-   Przy wszelkich pracach związanych z `Dockerfile`, `docker-compose.yml`, skryptem `scripts/entrypoint.sh`, uprawnieniami wolumenów SQLite (UID 1000) oraz konfiguracją Reverse Proxy (Nginx/Caddy) dla streamingu SSE serwera MCP (ChatGPT), **bezwzględnie przeczytaj i stosuj procedury z [docs/deployment.md](docs/deployment.md)** oraz [docs/deploy-r2d2.md](docs/deploy-r2d2.md).
+
 ## Zasady implementacji
 
 -   Preferuj małe, czytelne moduły i jawne kontrakty.
@@ -35,7 +39,8 @@ większą zmianą.
 -   Obsługuj timeouty, limity API, retry z backoffem i błędy częściowe.
 -   Nie zakładaj poprawności niezweryfikowanych endpointów; sprawdź
     aktualną dokumentację i zapisz potwierdzone decyzje.
--   Nie dodawaj zależności bez potrzeby.
+-   Zero nieautoryzowanych zależności: nie dodawaj nowych bibliotek bez
+    wyraźnej dyspozycji użytkownika.
 -   Współbieżność i SQLite: zadania w tle oraz równoległe korutyny muszą
     otwierać własną, krótką sesję `SessionLocal()` w bloku kontekstowym;
     nigdy nie współdziel sesji pomiędzy taskami asyncio ani nie trzymaj
@@ -52,7 +57,8 @@ większą zmianą.
 
 ## Testy i Definition of Done
 
--   Dodaj testy do każdej nowej logiki.
+-   Dodaj testy do każdej nowej logiki (TDD/BFF: weryfikacja błędu/test, potem minimalna implementacja).
+-   Przed i po zmianach uruchom linter i testy (`ruff`, `pytest`).
 -   Testuj integracje z mockami; testy live oznaczaj oddzielnie.
 -   Do mockowania zapytań HTTP w testach używaj wyłącznie wbudowanego
     `httpx.MockTransport` (bez doinstalowywania respx/responses).
@@ -68,5 +74,5 @@ większą zmianą.
 1.  Przed implementacją przedstaw krótki plan i pliki, które zmienisz.
 2.  Realizuj jeden etap roadmapy naraz.
 3.  Nie rozszerzaj zakresu samodzielnie.
-4.  Po zmianie uruchom odpowiednie testy i podsumuj wynik oraz pozostałe
-    ryzyka.
+4.  Po zmianie uruchom odpowiednie testy i podsumuj wynik oraz pozostałe ryzyka.
+5.  Przygotowuj logiczne commity w standardzie Conventional Commits (np. `feat(auth): ...`, `docs(deployment): ...`).

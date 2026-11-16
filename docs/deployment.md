@@ -1,25 +1,17 @@
----
-name: docker-proxmox-sqlite
-description: >-
-  Wzorce i procedury wdrażania aplikacji z bazą SQLite w trybie WAL w środowisku Docker i Proxmox VE (LXC),
-  z uwzględnieniem uprawnień wolumenów, automatycznych migracji Alembic oraz konfiguracji Reverse Proxy (Nginx/Caddy)
-  dla streamingu SSE serwera MCP (ChatGPT).
----
-
 # Wdrożenie Docker + SQLite (WAL) na Proxmox VE (LXC) & MCP SSE
 
-Przewodnik wdrożeniowy i wzorce konfiguracji dla uruchamiania aplikacji opartej na FastAPI, SQLite i serwerze MCP w kontenerze Docker na hoście Proxmox VE (kontener Debian LXC z Dockerem) jako usługa 24/7.
+Wzorcowa architektura wdrożeniowa i procedury operacyjne dla uruchamiania aplikacji opartej na FastAPI, SQLite i serwerze MCP w kontenerze Docker na hoście Proxmox VE (kontener Debian LXC z Dockerem) jako usługa 24/7.
 
 ---
 
 ## 1. Architektura uprawnień wolumenu SQLite (WAL)
 
 ### Problem
-SQLite w trybie WAL (`PRAGMA journal_mode=WAL;`) wymaga tworzenia i modyfikowania plików tymczasowych (`movie_recommend.db-wal` oraz `movie_recommend.db-shm`) **w tym samym katalogu**, w którym znajduje się baza danych. Jeśli proces wewnątrz kontenera działa jako użytkownik nieuprzywilejowany (np. `appuser` o UID `1000`), a montowany wolumen z hosta należy do `root:root`, SQLite zgłasza błąd:
+SQLite w trybie WAL (`PRAGMA journal_mode=WAL;`) wymaga tworzenia i modyfikowania plików tymczasowych (`movie_recommend.db-wal` oraz `movie_recommend.db-shm`) **w tym samym katalogu**, w którym znajduje się plik bazy danych. Jeśli proces wewnątrz kontenera działa jako użytkownik nieuprzywilejowany (np. `appuser` o UID `1000`), a montowany wolumen z hosta należy do `root:root`, SQLite zgłasza błąd:
 `sqlite3.OperationalError: unable to open database file`.
 
 ### Rozwiązanie
-1. Kontener buduje dedykowanego użytkownika i grupę o stałym UID/GID:
+1. Kontener tworzy dedykowanego użytkownika i grupę o stałym UID/GID:
    ```dockerfile
    RUN groupadd -g 1000 appuser && \
        useradd -u 1000 -g appuser -m -s /bin/bash appuser
@@ -29,11 +21,11 @@ SQLite w trybie WAL (`PRAGMA journal_mode=WAL;`) wymaga tworzenia i modyfikowani
    sudo chown -R 1000:1000 ./data
    sudo chmod 775 ./data
    ```
-3. W skrypcie `entrypoint.sh` przed startem `uvicorn` weryfikowane są uprawnienia do zapisu w katalogu `/app/data`.
+3. W skrypcie `entrypoint.sh` przed startem `uvicorn` weryfikowane są uprawnienia do zapisu w katalogu bazy danych.
 
 ---
 
-## 2. Wzorcowy wieloetapowy `Dockerfile` z `uv`
+## 2. Wieloetapowy `Dockerfile` z `uv`
 
 ```dockerfile
 # syntax=docker/dockerfile:1
@@ -93,7 +85,7 @@ CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
 
 ---
 
-## 3. Wzorcowy skrypt startowy `entrypoint.sh`
+## 3. Skrypt startowy `entrypoint.sh`
 
 Skrypt automatycznie wykonuje migracje bazy danych przed startem aplikacji, gwarantując bezobsługowe aktualizacje:
 
@@ -113,7 +105,7 @@ fi
 
 # Automatyczna migracja schematu Alembic
 echo "[entrypoint] Sprawdzanie i aplikowanie migracji bazy danych..."
-alembic upgrade head
+python -m alembic upgrade head
 echo "[entrypoint] Migracje zakończone pomyślnie."
 
 # Przekazanie kontroli do uvicorn (CMD)
@@ -122,18 +114,18 @@ exec "$@"
 
 ---
 
-## 4. Wzorcowy `docker-compose.yml`
+## 4. Konfiguracja `docker-compose.yml`
 
 ```yaml
 version: "3.8"
 
 services:
-  movie-recommend:
+  curato:
     build:
       context: .
       dockerfile: Dockerfile
-    image: movie-recommend:latest
-    container_name: movie-recommend
+    image: curato:latest
+    container_name: curato
     restart: unless-stopped
     ports:
       - "8000:8000"
@@ -158,7 +150,19 @@ services:
 
 ChatGPT wymaga publicznego adresu HTTPS z poprawnym certyfikatem SSL oraz stabilnego transportu Server-Sent Events (SSE) pod adresem `/mcp/sse`. Domyślne proxy buforuje pakiety, co zrywa strumień SSE.
 
-### Wariant A: Nginx / Nginx Proxy Manager
+### Wariant A: Caddy (Caddyfile) — Rekomendowany
+
+Caddy domyślnie dobrze radzi sobie ze strumieniowaniem, z wyłączeniem buforowania:
+
+```caddy
+curato.twoja-domena.pl {
+    reverse_proxy 127.0.0.1:8000 {
+        flush_interval -1
+    }
+}
+```
+
+### Wariant B: Nginx / Nginx Proxy Manager
 
 W konfiguracji lokalizacji serwera Nginx dla endpointów MCP:
 
@@ -195,18 +199,6 @@ location / {
 }
 ```
 
-### Wariant B: Caddy (Caddyfile)
-
-Caddy domyślnie dobrze radzi sobie ze strumieniowaniem, ale warto jawnie wyłączyć buforowanie:
-
-```caddy
-recommend.twoja-domena.pl {
-    reverse_proxy 127.0.0.1:8000 {
-        flush_interval -1
-    }
-}
-```
-
 ---
 
 ## 6. Procedura wdrożenia w Proxmox VE (LXC)
@@ -214,24 +206,22 @@ recommend.twoja-domena.pl {
 1. **Utworzenie kontenera LXC**:
    - Szablon: Debian 12 (Bookworm) standard.
    - Pamięć: 1-2 GB RAM, 2 rdzenie CPU, dysk 10-20 GB.
-   - Opcje: Nesting włączony (`features: nesting=1`) dla obsługi Dockera.
-2. **Instalacja Dockera w LXC**:
-   - Postępuj zgodnie z oficjalnym repozytorium Dockera dla Debiana (`docker-ce`, `docker-compose-plugin`).
-3. **Klonowanie repozytorium i uprawnienia bazy**:
+   - Opcje: Nesting włączony (`features: nesting=1,keyctl=1`) dla obsługi Dockera.
+2. **Klonowanie repozytorium i uprawnienia bazy**:
    ```bash
-   git clone <repo_url> /opt/movie-recommend
-   cd /opt/movie-recommend
+   git clone <repo_url> /opt/curato
+   cd /opt/curato
    cp .env.example .env
    # Wypełnij klucze w .env (SIMKL, TMDB, GEMINI, MCP_API_KEY)
    mkdir -p data
    sudo chown -R 1000:1000 data
    sudo chmod 775 data
    ```
-4. **Uruchomienie i weryfikacja**:
+3. **Uruchomienie i weryfikacja**:
    ```bash
    docker compose up -d --build
    docker compose logs -f
    curl http://localhost:8000/api/health
    ```
-5. **Kopie zapasowe (Proxmox Backup Server / VZDump)**:
+4. **Kopie zapasowe (Proxmox Backup Server / VZDump)**:
    - Dzięki umieszczeniu bazy w trybie WAL na wolumenie hosta LXC, standardowy backup Proxmox (tryb `snapshot`) wykonuje w 100% spójną kopię zapasową całego kontenera wraz z bazą.
