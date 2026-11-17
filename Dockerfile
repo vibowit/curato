@@ -33,6 +33,7 @@ COPY --from=builder --chown=appuser:appuser /app/.venv /app/.venv
 COPY --chown=appuser:appuser app /app/app
 COPY --chown=appuser:appuser migrations /app/migrations
 COPY --chown=appuser:appuser frontend /app/frontend
+COPY --chown=appuser:appuser locales /app/locales
 COPY --chown=appuser:appuser alembic.ini pyproject.toml /app/
 COPY --chown=appuser:appuser scripts/entrypoint.sh /app/entrypoint.sh
 
