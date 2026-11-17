@@ -99,3 +99,6 @@ class TasteProfileGenerateRequest(BaseModel):
     limit_history_items: int = Field(
         default=150, ge=10, le=500, description="Maximum number of history items to feed to LLM"
     )
+    language: Optional[str] = Field(
+        default=None, description="Language code for narrative profile fields (e.g. 'pl', 'en')"
+    )

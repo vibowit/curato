@@ -66,6 +66,9 @@ class RecommendationRunCreateRequest(BaseModel):
     force_profile_version: Optional[str] = Field(
         default=None, description="Optional specific taste profile version to use instead of active"
     )
+    language: Optional[str] = Field(
+        default=None, description="Language code for recommendations (e.g. 'pl', 'en')"
+    )
 
 
 class MediaItemSummary(BaseModel):

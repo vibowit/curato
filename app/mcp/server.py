@@ -181,8 +181,15 @@ async def sync_simkl(full_sync: bool = False) -> Dict[str, Any]:
 
 
 @mcp_server.tool()
-async def generate_recommendations(movie_limit: int = 10, show_limit: int = 5) -> Dict[str, Any]:
-    """Generates a new recommendation edition (movies & shows) based on active profile."""
+async def generate_recommendations(
+    movie_limit: int = 10,
+    show_limit: int = 5,
+    language: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Generates a new recommendation edition (movies & shows) based on active profile.
+
+    Supports optional language parameter (e.g. 'pl', 'en').
+    """
     try:
         with SessionLocal() as db:
             service = RecommendationService()
@@ -190,6 +197,7 @@ async def generate_recommendations(movie_limit: int = 10, show_limit: int = 5) -
                 movie_limit=movie_limit,
                 show_limit=show_limit,
                 mode="on_demand",
+                language=language,
             )
             run = await service.create_recommendation_run(db=db, request=req)
             schema = service.to_read_schema(run)

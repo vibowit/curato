@@ -123,6 +123,7 @@ class TMDBClient:
         transport: Optional[httpx.AsyncBaseTransport] = None,
         max_retries: int = 3,
         rate_limit_per_second: float = 20.0,
+        default_language: Optional[str] = None,
     ):
         raw_key = api_key or (
             settings.TMDB_API_KEY.get_secret_value() if settings.TMDB_API_KEY else None
@@ -146,6 +147,7 @@ class TMDBClient:
 
         self.api_key = raw_key
         self.read_access_token = raw_token
+        self.default_language = default_language
         self.base_url = base_url.rstrip("/")
         self.timeout = timeout
         self.max_retries = max_retries
@@ -185,10 +187,12 @@ class TMDBClient:
         self._last_request_time = time.monotonic()
 
     def _prepare_params(self, params: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-        """Injects api_key if Bearer token is not present."""
+        """Injects api_key if Bearer token is not present and language if configured."""
         query_params = dict(params or {})
         if not self.read_access_token and self.api_key:
             query_params["api_key"] = self.api_key
+        if self.default_language and "language" not in query_params:
+            query_params["language"] = self.default_language
         return query_params
 
     async def _request(

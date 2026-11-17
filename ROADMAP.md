@@ -106,6 +106,18 @@ historii. (Ukończono pomyślnie)
 
 **Akceptacja:** Czyste, bezpieczne repozytorium na GitHubie pełniące rolę publicznego portfolio bez narzutu obsługi społeczności, automatycznie synchronizowany lokalny mirror na Gitea pod Proxmox oraz zautomatyzowane testy CI/CD zakończone sukcesem. (Ukończono pomyślnie)
 
+## Etap 9 -- Wielojęzyczność (i18n: PL/EN) i rozszerzalność dla użytkownika
+
+-   [x] Architektura słowników JSON (`locales/pl.json`, `locales/en.json`) z wbudowanym mechanizmem rozszerzalności (`data/locales/` dla użytkownika).
+-   [x] Backendowy serwis `LocaleService` z automatycznym fallbackiem brakujących kluczy.
+-   [x] Endpointy API `/api/v1/languages` oraz `/api/v1/languages/{code}`.
+-   [x] Dynamiczna lokalizacja UI (HTML/JS/CSS z atrybutami `data-i18n` i selektorem języka w navbarze).
+-   [x] Zlokalizowane prompty LLM dla profilu gustu oraz rekomendacji (generowanie `reason`, `positive_factors`, `risks` i `summary` w wybranym języku).
+-   [x] Integracja parametru `language` w TMDB API.
+-   [x] Rozszerzenie serwera MCP o opcjonalny parametr `language`.
+
+**Akceptacja:** Użytkownik może dynamicznie przełączać język interfejsu (PL/EN), generować rekomendacje w wybranym języku oraz zdefiniować własny język poprzez dodanie pojedynczego pliku JSON. (Ukończono pomyślnie)
+
 ## Przyszłe rozszerzenia (Future Backlog)
 
 -   Powiadomienia Pushover / Telegram o wygenerowaniu nowej edycji przez scheduler.

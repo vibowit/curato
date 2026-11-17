@@ -213,3 +213,22 @@ def test_get_profile_by_version_not_found(db_session: Session):
     service = TasteService(MockLLMProvider())
     with pytest.raises(NotFoundException):
         service.get_profile_by_version(db_session, "v999.0")
+
+
+@pytest.mark.asyncio
+async def test_generate_profile_with_language(db_session: Session):
+    seed_sample_history(db_session)
+    mock_provider = MockLLMProvider()
+    service = TasteService(mock_provider)
+
+    from app.schemas.taste import TasteProfileGenerateRequest
+
+    req_en = TasteProfileGenerateRequest(language="en")
+    profile_en = await service.generate_profile(db_session, req_en)
+    content_en = json.loads(profile_en.profile_json)
+    assert content_en["metadata"]["language"] == "en"
+
+    req_pl = TasteProfileGenerateRequest(language="pl")
+    profile_pl = await service.generate_profile(db_session, req_pl)
+    content_pl = json.loads(profile_pl.profile_json)
+    assert content_pl["metadata"]["language"] == "pl"

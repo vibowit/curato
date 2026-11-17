@@ -8,7 +8,7 @@ class Settings(BaseSettings):
     """Central application settings validated with Pydantic Settings."""
 
     PROJECT_NAME: str = "Movie & Show Recommendation System"
-    VERSION: str = "0.1.0"
+    VERSION: str = "0.1.1"
     ENVIRONMENT: str = "development"
     LOG_LEVEL: str = "INFO"
 
@@ -43,6 +43,9 @@ class Settings(BaseSettings):
     SCHEDULER_ENABLED: bool = False
     SCHEDULER_INTERVAL_HOURS: int = 168
     SCHEDULER_RUN_ON_STARTUP: bool = False
+
+    # Localization
+    DEFAULT_LANGUAGE: str = "pl"
 
     model_config = SettingsConfigDict(
         env_file=".env",

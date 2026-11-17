@@ -9,6 +9,7 @@ from typing import Any, Dict, List, Optional, Set, Tuple
 from sqlalchemy import desc, select
 from sqlalchemy.orm import Session
 
+from app.core.config import settings
 from app.core.errors import (
     InvalidStateException,
     NotFoundException,
@@ -32,6 +33,7 @@ from app.schemas.recommendation import (
 )
 from app.schemas.taste import TasteProfileContent
 from app.services.discovery import DiscoveryService
+from app.services.locale import locale_service
 
 logger = logging.getLogger(__name__)
 
@@ -239,7 +241,8 @@ class SemanticScorer:
         self,
         candidates: List[CandidateItem],
         profile: TasteProfileContent,
-    ) -> str:
+        language: Optional[str] = None,
+    ) -> Tuple[str, str]:
         candidates_json = []
         for idx, cand in enumerate(candidates):
             candidates_json.append(
@@ -263,8 +266,34 @@ class SemanticScorer:
             "anti_preferences": profile.anti_preferences,
         }
 
+        lang = language or settings.DEFAULT_LANGUAGE
+        prompts = locale_service.get_prompt_templates(lang)
+        rec_prompts = prompts.get("recommendations", {})
+
+        system_instruction = rec_prompts.get(
+            "system_instruction",
+            (
+                "You are a sophisticated cinematic taste analyzer and personal recommender. "
+                "Output strictly valid JSON conforming to the requested schema. "
+                "Do not invent metadata."
+            ),
+        )
+
+        reason_instr = rec_prompts.get(
+            "reason_instruction",
+            "1-2 sentence compelling narrative explaining why this title fits.",
+        )
+        pos_instr = rec_prompts.get(
+            "positive_factors_instruction",
+            "1 to 3 concise strings describing why this matches user taste.",
+        )
+        risks_instr = rec_prompts.get(
+            "risks_instruction",
+            "0 to 2 potential concerns or mismatch risks (or empty list if none).",
+        )
+
         n = len(candidates)
-        return f"""
+        prompt = f"""
 Analyze the following media candidates and evaluate how well each fits the user's taste profile.
 You MUST return a JSON object with an "evaluations" array containing exactly {n} items.
 Every candidate from index 0 to {n-1} must have an evaluation.
@@ -279,25 +308,23 @@ Guidelines:
 1. "candidate_index": Exact integer index of candidate from the list (0 to {n-1}).
 2. "match_score": Float 0 to 100 representing semantic fit with user profile.
 3. "confidence": Float 0.0 to 1.0 reflecting confidence from metadata quality.
-4. "positive_factors": 1 to 3 concise strings describing why this matches user taste.
-5. "risks": 0 to 2 potential concerns or mismatch risks (or empty list if none).
-6. "reason": 1-2 sentence compelling Polish narrative explaining why this title fits.
+4. "positive_factors": {pos_instr}
+5. "risks": {risks_instr}
+6. "reason": {reason_instr}
 """
+        return prompt, system_instruction
 
     async def evaluate_candidates(
         self,
         candidates: List[CandidateItem],
         profile: TasteProfileContent,
+        language: Optional[str] = None,
     ) -> Dict[int, LLMRecommendationEvaluation]:
         """Calls LLM to evaluate candidates and returns map of candidate_index -> evaluation."""
         if not candidates:
             return {}
 
-        prompt = self._create_prompt(candidates, profile)
-        system_instruction = (
-            "You are a sophisticated cinematic taste analyzer and personal recommender. "
-            "Output strictly valid JSON conforming to the requested schema. Do not invent metadata."
-        )
+        prompt, system_instruction = self._create_prompt(candidates, profile, language=language)
 
         try:
             raw_response = await self.llm_provider.generate_structured(
@@ -424,12 +451,14 @@ class RecommendationService:
             exclude_anim = any("anim" in g.lower() for g in req.exclude_genres) or any(
                 "anim" in a.lower() for a in profile_content.anti_preferences
             )
+            target_lang = req.language or settings.DEFAULT_LANGUAGE
 
             # 3. Discover candidates from TMDB
             candidates = await self.discovery.discover_candidates(
                 db=db,
                 profile=profile_content,
                 exclude_genres=req.exclude_genres,
+                language=target_lang,
             )
             if not candidates:
                 raise UpstreamErrorException(
@@ -458,10 +487,12 @@ class RecommendationService:
             movie_evals_map = await self.semantic_scorer.evaluate_candidates(
                 candidates=top_movies,
                 profile=profile_content,
+                language=target_lang,
             )
             show_evals_map = await self.semantic_scorer.evaluate_candidates(
                 candidates=top_shows,
                 profile=profile_content,
+                language=target_lang,
             )
 
             evaluated_movies: List[Tuple[CandidateItem, LLMRecommendationEvaluation]] = []
@@ -469,16 +500,25 @@ class RecommendationService:
                 ev = movie_evals_map.get(idx)
                 if not ev:
                     g_sub = ", ".join(cand.genres[:2])
+                    if target_lang == "en":
+                        pos_factors = [f"Genre alignment: {g_sub}"]
+                        fallback_reason = (
+                            "Recommended title based on taste profile and "
+                            f"TMDB rating ({cand.vote_average})."
+                        )
+                    else:
+                        pos_factors = [f"Dopasowanie gatunkowe: {g_sub}"]
+                        fallback_reason = (
+                            "Film polecany na podstawie profilu gustu oraz "
+                            f"oceny TMDB ({cand.vote_average})."
+                        )
                     ev = LLMRecommendationEvaluation(
                         candidate_index=idx,
                         match_score=min(95.0, max(60.0, cand.vote_average * 10.0)),
                         confidence=0.7,
-                        positive_factors=[f"Dopasowanie gatunkowe: {g_sub}"],
+                        positive_factors=pos_factors,
                         risks=[],
-                        reason=(
-                            f"Film polecany na podstawie profilu gustu "
-                            f"oraz oceny TMDB ({cand.vote_average})."
-                        ),
+                        reason=fallback_reason,
                     )
                 evaluated_movies.append((cand, ev))
 
@@ -487,16 +527,25 @@ class RecommendationService:
                 ev = show_evals_map.get(idx)
                 if not ev:
                     g_sub = ", ".join(cand.genres[:2])
+                    if target_lang == "en":
+                        pos_factors = [f"Genre alignment: {g_sub}"]
+                        fallback_reason = (
+                            "Recommended TV show based on taste profile and "
+                            f"TMDB rating ({cand.vote_average})."
+                        )
+                    else:
+                        pos_factors = [f"Dopasowanie gatunkowe: {g_sub}"]
+                        fallback_reason = (
+                            "Serial polecany na podstawie profilu gustu oraz "
+                            f"oceny TMDB ({cand.vote_average})."
+                        )
                     ev = LLMRecommendationEvaluation(
                         candidate_index=idx,
                         match_score=min(95.0, max(60.0, cand.vote_average * 10.0)),
                         confidence=0.7,
-                        positive_factors=[f"Dopasowanie gatunkowe: {g_sub}"],
+                        positive_factors=pos_factors,
                         risks=[],
-                        reason=(
-                            f"Serial polecany na podstawie profilu gustu "
-                            f"oraz oceny TMDB ({cand.vote_average})."
-                        ),
+                        reason=fallback_reason,
                     )
                 evaluated_shows.append((cand, ev))
 
@@ -594,10 +643,18 @@ class RecommendationService:
 
             # 9. Update run status to completed
             run.status = "completed"
-            run.summary = (
-                f"Wygenerowano pomyślnie {len(final_movies)} filmów i {len(final_shows)} seriali "
-                f"w oparciu o profil {profile_model.version}."
-            )
+            if target_lang == "en":
+                run.summary = (
+                    f"Successfully generated {len(final_movies)} movies "
+                    f"and {len(final_shows)} TV shows based on taste profile "
+                    f"{profile_model.version}."
+                )
+            else:
+                run.summary = (
+                    f"Wygenerowano pomyślnie {len(final_movies)} filmów i "
+                    f"{len(final_shows)} seriali w oparciu o profil "
+                    f"{profile_model.version}."
+                )
             db.commit()
             db.refresh(run)
             return run

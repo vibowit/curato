@@ -186,3 +186,18 @@ async def test_tmdb_client_videos_and_extract_best_trailer():
     # Test empty payload
     none_best = TMDBClient.extract_best_trailer({})
     assert none_best is None
+
+
+@pytest.mark.asyncio
+async def test_tmdb_default_language():
+    captured_params = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        nonlocal captured_params
+        captured_params = dict(request.url.params)
+        return httpx.Response(200, json={"results": []})
+
+    transport = httpx.MockTransport(handler)
+    client = TMDBClient(api_key="test_key", transport=transport, default_language="pl-PL")
+    await client.discover_movies()
+    assert captured_params.get("language") == "pl-PL"

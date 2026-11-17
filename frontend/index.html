@@ -16,22 +16,28 @@
       <div class="brand">
         <span class="brand-icon">🎬</span>
         <div>
-          <h1 class="brand-title">Simkl Recommender</h1>
-          <p class="brand-subtitle">Prywatny silnik rekomendacji filmów i seriali</p>
+          <h1 class="brand-title" data-i18n="brand_title">Simkl Recommender</h1>
+          <p class="brand-subtitle" data-i18n="brand_subtitle">Prywatny silnik rekomendacji filmów i seriali</p>
         </div>
       </div>
       <div class="header-actions">
+        <!-- Language selector -->
+        <div class="lang-picker">
+          <select id="lang-select" class="select-lang" aria-label="Language selection" title="Wybierz język">
+            <!-- Dynamically populated from /api/v1/languages -->
+          </select>
+        </div>
         <button id="btn-profile" class="badge badge-profile" style="cursor: pointer;" title="Kliknij, aby zobaczyć lub wygenerować profil gustu">
-          🧠 <span id="profile-pill-text">Profil: Ładowanie...</span>
+          🧠 <span id="profile-pill-text" data-i18n="profile_loading">Profil: Ładowanie...</span>
         </button>
         <button id="btn-sync" class="btn btn-secondary">
-          <span class="icon">🔄</span> Sync Simkl
+          <span class="icon">🔄</span> <span data-i18n="btn_sync">Sync Simkl</span>
         </button>
         <button id="btn-new-run" class="btn btn-primary">
-          <span class="icon">✨</span> Nowa Edycja
+          <span class="icon">✨</span> <span data-i18n="btn_new_run">Nowa Edycja</span>
         </button>
         <button id="btn-history" class="btn btn-secondary">
-          <span class="icon">📜</span> Historia Decyzji
+          <span class="icon">📜</span> <span data-i18n="btn_history">Historia Decyzji</span>
         </button>
       </div>
     </div>
@@ -42,9 +48,9 @@
     <!-- Run Info & Filter Toolbar -->
     <section class="toolbar-section">
       <div class="run-selector-row">
-        <label for="run-select" class="form-label">Edycja rekomendacji:</label>
+        <label for="run-select" class="form-label" data-i18n="run_selector_label">Edycja rekomendacji:</label>
         <select id="run-select" class="select-input">
-          <option value="">Ładowanie wygenerowanych edycji...</option>
+          <option value="" data-i18n="run_select_placeholder">Ładowanie wygenerowanych edycji...</option>
         </select>
         <span id="run-meta-status" class="badge">Status</span>
       </div>
@@ -53,25 +59,25 @@
         <div class="summary-header">
           <span id="summary-meta" class="summary-meta">Edycja: - | Model: - | Data: -</span>
         </div>
-        <p id="summary-text" class="summary-text">Wybierz lub wygeneruj edycję rekomendacji.</p>
+        <p id="summary-text" class="summary-text" data-i18n="run_summary_empty">Wybierz lub wygeneruj edycję rekomendacji.</p>
       </div>
 
       <!-- Filters -->
       <div class="filters-bar">
         <div class="filter-group">
-          <span class="filter-label">Typ:</span>
-          <button class="chip active" data-type-filter="all">Wszystkie</button>
-          <button class="chip" data-type-filter="movie">Filmy</button>
-          <button class="chip" data-type-filter="show">Seriale</button>
+          <span class="filter-label" data-i18n="filter_type">Typ:</span>
+          <button class="chip active" data-type-filter="all" data-i18n="filter_type_all">Wszystkie</button>
+          <button class="chip" data-type-filter="movie" data-i18n="filter_type_movie">Filmy</button>
+          <button class="chip" data-type-filter="show" data-i18n="filter_type_show">Seriale</button>
         </div>
         <div class="filter-group">
-          <span class="filter-label">Status:</span>
-          <button class="chip active" data-status-filter="all">Wszystkie</button>
-          <button class="chip" data-status-filter="pending">Do decyzji</button>
-          <button class="chip" data-status-filter="accepted">Zaakceptowane</button>
-          <button class="chip" data-status-filter="added">W Simkl</button>
-          <button class="chip" data-status-filter="rejected">Odrzucone</button>
-          <button class="chip" data-status-filter="seen">Obejrzane</button>
+          <span class="filter-label" data-i18n="filter_status">Status:</span>
+          <button class="chip active" data-status-filter="all" data-i18n="filter_status_all">Wszystkie</button>
+          <button class="chip" data-status-filter="pending" data-i18n="filter_status_pending">Do decyzji</button>
+          <button class="chip" data-status-filter="accepted" data-i18n="filter_status_accepted">Zaakceptowane</button>
+          <button class="chip" data-status-filter="added" data-i18n="filter_status_added">W Simkl</button>
+          <button class="chip" data-status-filter="rejected" data-i18n="filter_status_rejected">Odrzucone</button>
+          <button class="chip" data-status-filter="seen" data-i18n="filter_status_seen">Obejrzane</button>
         </div>
       </div>
     </section>
@@ -80,7 +86,7 @@
     <section id="recommendations-container" class="cards-grid">
       <div class="loading-state">
         <div class="spinner"></div>
-        <p>Ładowanie rekomendacji...</p>
+        <p data-i18n="loading_recommendations">Ładowanie rekomendacji...</p>
       </div>
     </section>
   </main>
@@ -91,12 +97,12 @@
       <div class="approval-info">
         <span class="icon">✅</span>
         <div>
-          <strong id="approved-count-text">0 pozycji zaakceptowanych</strong>
-          <p class="subtext">Zostaną bezpiecznie dodane do Twojej listy Plan to Watch w Simkl (bez ryzyka duplikatów).</p>
+          <strong id="approved-count-text">0 <span data-i18n="approved_items_count">pozycji zaakceptowanych</span></strong>
+          <p class="subtext" data-i18n="approved_items_subtext">Zostaną bezpiecznie dodane do Twojej listy Plan to Watch w Simkl (bez ryzyka duplikatów).</p>
         </div>
       </div>
       <button id="btn-submit-approve" class="btn btn-success btn-lg">
-        🚀 Wyślij zaakceptowane do Simkl
+        🚀 <span data-i18n="btn_submit_approve">Wyślij zaakceptowane do Simkl</span>
       </button>
     </div>
   </aside>
@@ -105,27 +111,33 @@
   <div id="modal-new-run" class="modal-overlay hidden">
     <div class="modal-dialog">
       <div class="modal-header">
-        <h3>Generowanie nowej edycji rekomendacji</h3>
+        <h3 data-i18n="modal_new_run_title">Generowanie nowej edycji rekomendacji</h3>
         <button class="modal-close" data-close-modal>&times;</button>
       </div>
       <form id="form-new-run" class="modal-body">
         <div class="form-group">
-          <label for="input-movie-limit">Liczba filmów (domyślnie 10):</label>
+          <label for="input-run-language" data-i18n="field_language">Język rekomendacji:</label>
+          <select id="input-run-language" class="select-input">
+            <!-- Dynamically populated -->
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="input-movie-limit" data-i18n="field_movie_limit">Liczba filmów (domyślnie 10):</label>
           <input type="number" id="input-movie-limit" class="input" value="10" min="1" max="50">
         </div>
         <div class="form-group">
-          <label for="input-show-limit">Liczba seriali (domyślnie 5):</label>
+          <label for="input-show-limit" data-i18n="field_show_limit">Liczba seriali (domyślnie 5):</label>
           <input type="number" id="input-show-limit" class="input" value="5" min="1" max="25">
         </div>
         <div class="form-group">
           <label for="input-exclude-animation" class="checkbox-label">
             <input type="checkbox" id="input-exclude-animation" checked>
-            Wyklucz animacje (zgodnie z preferencjami gustu)
+            <span data-i18n="field_exclude_animation">Wyklucz animacje (zgodnie z preferencjami gustu)</span>
           </label>
         </div>
         <div class="modal-footer">
-          <button type="button" class="btn btn-secondary" data-close-modal>Anuluj</button>
-          <button type="submit" id="btn-submit-run" class="btn btn-primary">Uruchom generowanie</button>
+          <button type="button" class="btn btn-secondary" data-close-modal data-i18n="btn_cancel">Anuluj</button>
+          <button type="submit" id="btn-submit-run" class="btn btn-primary" data-i18n="btn_start_generation">Uruchom generowanie</button>
         </div>
       </form>
     </div>
@@ -135,19 +147,19 @@
   <div id="modal-profile" class="modal-overlay hidden">
     <div class="modal-dialog modal-lg">
       <div class="modal-header">
-        <h3>🧠 Profil Gustu Użytkownika</h3>
+        <h3 data-i18n="modal_profile_title">🧠 Profil Gustu Użytkownika</h3>
         <button class="modal-close" data-close-modal>&times;</button>
       </div>
       <div class="modal-body">
         <div id="profile-content-container">
-          <p class="loading-text">Ładowanie profilu gustu...</p>
+          <p class="loading-text" data-i18n="profile_loading">Ładowanie profilu gustu...</p>
         </div>
       </div>
       <div class="modal-footer" style="display: flex; justify-content: space-between; align-items: center;">
-        <button type="button" id="btn-generate-profile" class="btn btn-primary">
+        <button type="button" id="btn-generate-profile" class="btn btn-primary" data-i18n="btn_generate_profile">
           ⚡ Wygeneruj profil (Gemini)
         </button>
-        <button type="button" class="btn btn-secondary" data-close-modal>Zamknij</button>
+        <button type="button" class="btn btn-secondary" data-close-modal data-i18n="btn_close">Zamknij</button>
       </div>
     </div>
   </div>
@@ -156,7 +168,7 @@
   <div id="modal-history" class="modal-overlay hidden">
     <div class="modal-dialog modal-lg">
       <div class="modal-header">
-        <h3>Historia decyzji użytkownika</h3>
+        <h3 data-i18n="modal_history_title">Historia decyzji użytkownika</h3>
         <button class="modal-close" data-close-modal>&times;</button>
       </div>
       <div class="modal-body">
@@ -165,7 +177,7 @@
         </div>
       </div>
       <div class="modal-footer">
-        <button type="button" class="btn btn-secondary" data-close-modal>Zamknij</button>
+        <button type="button" class="btn btn-secondary" data-close-modal data-i18n="btn_close">Zamknij</button>
       </div>
     </div>
   </div>
@@ -174,7 +186,7 @@
   <div id="modal-trailer" class="modal-overlay hidden">
     <div class="modal-dialog modal-video">
       <div class="modal-header">
-        <h3 id="modal-trailer-title">Zwiastun</h3>
+        <h3 id="modal-trailer-title" data-i18n="modal_trailer_title">Zwiastun</h3>
         <button class="modal-close" data-close-trailer>&times;</button>
       </div>
       <div class="modal-body modal-video-body">
@@ -183,17 +195,17 @@
         </div>
         <div id="trailer-fallback-container" class="trailer-fallback hidden">
           <div class="fallback-icon">🎬</div>
-          <p id="trailer-fallback-text">Brak bezpośredniego zwiastuna w bazie TMDB dla tej pozycji.</p>
-          <a id="trailer-fallback-link" href="#" target="_blank" rel="noopener noreferrer" class="btn btn-primary">
+          <p id="trailer-fallback-text" data-i18n="trailer_fallback_text">Brak bezpośredniego zwiastuna w bazie TMDB dla tej pozycji.</p>
+          <a id="trailer-fallback-link" href="#" target="_blank" rel="noopener noreferrer" class="btn btn-primary" data-i18n="trailer_fallback_search">
             🔍 Szukaj zwiastuna na YouTube
           </a>
         </div>
       </div>
       <div class="modal-footer modal-video-footer">
-        <a id="trailer-direct-link" href="#" target="_blank" rel="noopener noreferrer" class="btn btn-secondary btn-sm">
+        <a id="trailer-direct-link" href="#" target="_blank" rel="noopener noreferrer" class="btn btn-secondary btn-sm" data-i18n="trailer_open_youtube">
           Otwórz na YouTube ↗
         </a>
-        <button type="button" class="btn btn-secondary btn-sm" data-close-trailer>Zamknij</button>
+        <button type="button" class="btn btn-secondary btn-sm" data-close-trailer data-i18n="btn_close">Zamknij</button>
       </div>
     </div>
   </div>

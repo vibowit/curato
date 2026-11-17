@@ -16,6 +16,7 @@ from app.models.history import WatchHistory
 from app.models.media import MediaItem
 from app.schemas.recommendation import CandidateItem
 from app.schemas.taste import TasteProfileContent
+from app.services.locale import locale_service
 
 logger = logging.getLogger(__name__)
 
@@ -119,10 +120,14 @@ class DiscoveryService:
         exclude_genres: Optional[List[str]] = None,
         target_movies_pool: int = 60,
         target_shows_pool: int = 35,
+        language: Optional[str] = None,
     ) -> List[CandidateItem]:
         """Harvests candidates across 4 distinct strategies concurrently."""
         candidates_map: Dict[tuple[str, int], CandidateItem] = {}
         sem = asyncio.Semaphore(5)
+
+        if language:
+            self.tmdb.default_language = locale_service.get_tmdb_language(language)
 
         # 1. Determine without_genres (e.g. animation)
         without_genres_set: Set[str] = set()

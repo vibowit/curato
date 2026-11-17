@@ -1,3 +1,4 @@
+import json
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, Optional
 
@@ -473,3 +474,52 @@ async def test_recommendation_trailer_hydration_and_get_or_fetch(
     assert trailer_res.recommendation_id == rec1.id
     assert trailer_res.trailer_key == rec1.trailer_key
     assert trailer_res.trailer_url == rec1.trailer_url
+
+
+@pytest.mark.asyncio
+async def test_create_recommendation_run_with_english_language(test_db: Session):
+    taste_profile = TasteProfile(
+        version="v1.0-mock",
+        profile_json=json.dumps(
+            {
+                "summary": "Fan of mystery and psychological thrillers.",
+                "genres": [{"name": "Mystery", "weight": 0.9, "confidence": 0.85}],
+                "themes": [{"name": "Puzzle", "weight": 0.8, "confidence": 0.8}],
+                "directors_or_creators": ["David Fincher"],
+                "anti_preferences": [],
+                "temporary_interests": [],
+            }
+        ),
+        active=True,
+    )
+    test_db.add(taste_profile)
+    test_db.commit()
+
+    class MockDiscovery(DiscoveryService):
+        def __init__(self):
+            pass
+
+        async def discover_candidates(self, *args, **kwargs):
+            return [
+                CandidateItem(
+                    tmdb_id=201,
+                    media_type="movie",
+                    title="Se7en",
+                    year=1995,
+                    genres=["Mystery", "Thriller"],
+                    director_or_creator="David Fincher",
+                    vote_average=8.3,
+                    source_strategy="director",
+                ),
+            ]
+
+    service = RecommendationService(
+        discovery_service=MockDiscovery(),
+        llm_provider=MockLLM(),
+    )
+
+    req = RecommendationRunCreateRequest(movie_limit=1, show_limit=1, language="en")
+    run = await service.create_recommendation_run(test_db, req)
+    assert run.status == "completed"
+    assert "Successfully generated" in run.summary
+    assert "v1.0-mock" in run.summary

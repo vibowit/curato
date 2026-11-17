@@ -10,9 +10,14 @@ document.addEventListener("DOMContentLoaded", () => {
       status: "all",
     },
     activeProfile: null,
+    languages: [],
+    currentLang: localStorage.getItem("movie_recommend_lang") || "pl",
+    translations: {},
   };
 
   // DOM Elements
+  const langSelect = document.getElementById("lang-select");
+  const inputRunLanguage = document.getElementById("input-run-language");
   const profilePillText = document.getElementById("profile-pill-text");
   const btnProfile = document.getElementById("btn-profile");
   const modalProfile = document.getElementById("modal-profile");
@@ -34,6 +39,11 @@ document.addEventListener("DOMContentLoaded", () => {
   const formNewRun = document.getElementById("form-new-run");
   const historyTableContainer = document.getElementById("history-table-container");
   const toastContainer = document.getElementById("toast-container");
+
+  // Translation helper
+  function t(key, fallback = "") {
+    return state.translations?.ui?.[key] || fallback;
+  }
 
   // Helper: Toast Notifications
   function showToast(message, type = "info") {
@@ -62,7 +72,7 @@ document.addEventListener("DOMContentLoaded", () => {
         try {
           errData = await resp.json();
         } catch (_) {}
-        const msg = errData.message || `Błąd serwera (HTTP ${resp.status})`;
+        const msg = errData.message || `Server error (HTTP ${resp.status})`;
         throw new Error(msg);
       }
       if (resp.status === 204) return null;
@@ -73,8 +83,85 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
+  // i18n: Load available languages and initialize active language
+  async function initLanguages() {
+    try {
+      const langs = await api("/api/v1/languages");
+      state.languages = langs || [];
+
+      // Check if stored language is supported, fallback to first available
+      const langCodes = state.languages.map((l) => l.code);
+      if (!langCodes.includes(state.currentLang)) {
+        state.currentLang = langCodes.includes("pl") ? "pl" : langCodes[0] || "pl";
+      }
+
+      // Populate language selector in header
+      if (langSelect) {
+        langSelect.innerHTML = state.languages
+          .map((l) => `<option value="${l.code}">${l.flag || "🌐"} ${l.name}</option>`)
+          .join("");
+        langSelect.value = state.currentLang;
+      }
+
+      // Populate language selector in "New Run" modal
+      if (inputRunLanguage) {
+        inputRunLanguage.innerHTML = state.languages
+          .map((l) => `<option value="${l.code}">${l.flag || "🌐"} ${l.name}</option>`)
+          .join("");
+        inputRunLanguage.value = state.currentLang;
+      }
+
+      // Fetch dictionary for current language
+      await applyLanguage(state.currentLang);
+    } catch (err) {
+      console.error("Failed to initialize languages:", err);
+    }
+  }
+
+  // i18n: Fetch dictionary and update UI strings
+  async function applyLanguage(code) {
+    try {
+      const data = await api(`/api/v1/languages/${code}`);
+      state.translations = data;
+      state.currentLang = code;
+      localStorage.setItem("movie_recommend_lang", code);
+      document.documentElement.lang = code;
+
+      if (langSelect && langSelect.value !== code) {
+        langSelect.value = code;
+      }
+      if (inputRunLanguage && inputRunLanguage.value !== code) {
+        inputRunLanguage.value = code;
+      }
+
+      // Update static elements with data-i18n attribute
+      document.querySelectorAll("[data-i18n]").forEach((el) => {
+        const key = el.getAttribute("data-i18n");
+        const val = t(key);
+        if (val) {
+          el.textContent = val;
+        }
+      });
+
+      // Update dynamic UI parts
+      if (state.activeProfile && profilePillText) {
+        profilePillText.textContent = `${t("profile_active", "Profil: Aktywny")}: ${state.activeProfile.version}`;
+      } else if (profilePillText) {
+        profilePillText.textContent = t("profile_none", "Profil: Brak");
+      }
+
+      updateApprovalBar();
+      if (state.recommendations && state.recommendations.length > 0) {
+        renderRecommendations();
+      }
+    } catch (err) {
+      console.error(`Failed to apply language ${code}:`, err);
+    }
+  }
+
   // Initial Load
   async function init() {
+    await initLanguages();
     await Promise.all([loadProfile(), loadRuns()]);
   }
 
@@ -84,12 +171,12 @@ document.addEventListener("DOMContentLoaded", () => {
       const data = await api("/api/profile");
       state.activeProfile = data;
       if (profilePillText) {
-        profilePillText.textContent = `Profil: ${data.version}`;
+        profilePillText.textContent = `${t("profile_active", "Profil: Aktywny")}: ${data.version}`;
       }
     } catch (err) {
       state.activeProfile = null;
       if (profilePillText) {
-        profilePillText.textContent = "Profil: brak";
+        profilePillText.textContent = t("profile_none", "Profil: Brak");
       }
     }
   }
@@ -102,12 +189,12 @@ document.addEventListener("DOMContentLoaded", () => {
       runSelect.innerHTML = "";
 
       if (!runs || runs.length === 0) {
-        runSelect.innerHTML = '<option value="">Brak wygenerowanych edycji</option>';
+        runSelect.innerHTML = `<option value="">${t("run_select_empty", "Brak wygenerowanych edycji")}</option>`;
         recsContainer.innerHTML = `
           <div class="empty-state">
             <span style="font-size: 3rem;">🎬</span>
-            <h3>Brak rekomendacji</h3>
-            <p>Nie wygenerowano jeszcze żadnej edycji. Kliknij "Nowa Edycja", aby stworzyć pierwsze propozycje.</p>
+            <h3>${t("no_recommendations", "Brak rekomendacji")}</h3>
+            <p>${t("run_summary_empty", "Nie wygenerowano jeszcze żadnej edycji. Kliknij 'Nowa Edycja', aby stworzyć pierwsze propozycje.")}</p>
           </div>
         `;
         return;
@@ -116,69 +203,75 @@ document.addEventListener("DOMContentLoaded", () => {
       runs.forEach((r) => {
         const opt = document.createElement("option");
         opt.value = r.id;
-        const dateStr = new Date(r.created_at).toLocaleString("pl-PL", {
+        const localeCode = state.currentLang === "en" ? "en-US" : "pl-PL";
+        const dateStr = new Date(r.created_at).toLocaleString(localeCode, {
           day: "2-digit",
           month: "2-digit",
           year: "numeric",
           hour: "2-digit",
           minute: "2-digit",
         });
-        opt.textContent = `Edycja #${r.id} (${dateStr}) - ${r.recommendations_count} pozycji`;
+        opt.textContent = `Edycja #${r.id} (${dateStr}) - ${r.status.toUpperCase()}`;
         runSelect.appendChild(opt);
       });
 
-      // Load the latest run by default
-      await loadRunDetails(runs[0].id);
+      // Load latest run automatically
+      const latestRunId = runs[0].id;
+      runSelect.value = latestRunId;
+      await loadRunDetails(latestRunId);
     } catch (err) {
-      showToast(`Błąd ładowania edycji: ${err.message}`, "error");
+      showToast(`Error loading runs: ${err.message}`, "error");
     }
   }
 
-  // Load Details of a Single Run
+  // Load Single Run Details and Items
   async function loadRunDetails(runId) {
-    recsContainer.innerHTML = `
-      <div class="loading-state">
-        <div class="spinner"></div>
-        <p>Ładowanie pozycji edycji #${runId}...</p>
-      </div>
-    `;
-
     try {
+      recsContainer.innerHTML = `
+        <div class="loading-state">
+          <div class="spinner"></div>
+          <p>${t("loading_recommendations", "Ładowanie rekomendacji...")}</p>
+        </div>
+      `;
+
       const run = await api(`/api/recommendation-runs/${runId}`);
       state.currentRun = run;
       state.recommendations = run.recommendations || [];
 
-      // Update Summary Header
-      const dateStr = new Date(run.created_at).toLocaleString("pl-PL");
-      summaryMeta.textContent = `Edycja #${run.id} | Profil: ${run.profile_version || "n/a"} | Model: ${run.model_name || run.model_provider || "LLM"} | Utworzono: ${dateStr}`;
-      summaryText.textContent = run.summary || "Brak podsumowania dla tej edycji.";
-
+      // Update Run Info Toolbar
       runMetaStatus.textContent = run.status.toUpperCase();
-      runMetaStatus.className = `badge ${run.status === "completed" ? "badge-status-accepted" : "badge-status-pending"}`;
+      runMetaStatus.className = `badge ${run.status === "completed" ? "badge-success" : "badge-warning"}`;
+
+      const localeCode = state.currentLang === "en" ? "en-US" : "pl-PL";
+      const dateFormatted = new Date(run.created_at).toLocaleString(localeCode);
+      summaryMeta.textContent = `Run #${run.id} | Model: ${run.model_provider || "N/A"} (${run.model_name || "N/A"}) | ${dateFormatted}`;
+      summaryText.textContent = run.summary || t("run_summary_empty", "Brak podsumowania dla tej edycji.");
 
       renderRecommendations();
       updateApprovalBar();
     } catch (err) {
-      showToast(`Nie udało się załadować edycji: ${err.message}`, "error");
+      showToast(`Error loading edition #${runId}: ${err.message}`, "error");
     }
   }
 
-  // Render Filtered Recommendations Grid
+  // Render Filtered Cards
   function renderRecommendations() {
     const { type, status } = state.filters;
-    const filtered = state.recommendations.filter((rec) => {
-      const mType = rec.media_item ? rec.media_item.media_type : "movie";
-      if (type !== "all" && mType !== type) return false;
-      if (status !== "all" && rec.status !== status) return false;
-      return true;
-    });
+    let filtered = state.recommendations;
+
+    if (type !== "all") {
+      filtered = filtered.filter((r) => r.media_item && r.media_item.media_type === type);
+    }
+    if (status !== "all") {
+      filtered = filtered.filter((r) => r.status === status);
+    }
 
     if (filtered.length === 0) {
       recsContainer.innerHTML = `
         <div class="empty-state">
-          <span style="font-size: 2.5rem;">🔍</span>
-          <h3>Brak pozycji dla wybranych filtrów</h3>
-          <p>Zmień kryteria filtrowania, aby zobaczyć inne rekomendacje.</p>
+          <span style="font-size: 3rem;">🔍</span>
+          <h3>${t("no_recommendations", "Brak pozycji dla wybranych filtrów")}</h3>
+          <p>${t("filter_status_all", "Zmień kryteria filtrowania, aby zobaczyć inne rekomendacje.")}</p>
         </div>
       `;
       return;
@@ -198,9 +291,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const media = rec.media_item || {};
     const isMovie = media.media_type === "movie";
-    const typeLabel = isMovie ? "FILM" : "SERIAL";
+    const typeLabel = isMovie ? t("filter_type_movie", "FILM").toUpperCase() : t("filter_type_show", "SERIAL").toUpperCase();
     const typeBadgeClass = isMovie ? "badge-movie" : "badge-show";
-    const title = media.title || "Nieznany tytuł";
+    const title = media.title || "Unknown title";
     const year = media.year ? `(${media.year})` : "";
     const posterUrl = media.poster_path
       ? (media.poster_path.startsWith("http") ? media.poster_path : `https://image.tmdb.org/t/p/w500${media.poster_path}`)
@@ -210,13 +303,13 @@ document.addEventListener("DOMContentLoaded", () => {
     const tmdbRating = media.vote_average ? Number(media.vote_average).toFixed(1) : null;
     const isLowConfidence = rec.confidence < 0.75;
 
-    // Status mapping
+    // Status mapping with localized labels
     const statusMap = {
-      pending: { label: "Do decyzji", class: "badge-status-pending" },
-      accepted: { label: "Zaakceptowano", class: "badge-status-accepted" },
-      added: { label: "W Simkl (Plan to Watch)", class: "badge-status-added" },
-      rejected: { label: "Odrzucono", class: "badge-status-rejected" },
-      seen: { label: "Obejrzane", class: "badge-status-seen" },
+      pending: { label: t("filter_status_pending", "Do decyzji"), class: "badge-status-pending" },
+      accepted: { label: t("filter_status_accepted", "Zaakceptowano"), class: "badge-status-accepted" },
+      added: { label: t("filter_status_added", "W Simkl"), class: "badge-status-added" },
+      rejected: { label: t("filter_status_rejected", "Odrzucono"), class: "badge-status-rejected" },
+      seen: { label: t("filter_status_seen", "Obejrzane"), class: "badge-status-seen" },
     };
     const currentStatus = statusMap[rec.status] || { label: rec.status, class: "badge-status-pending" };
 
@@ -226,7 +319,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const allRisks = [...(rec.risks || [])];
     if (isLowConfidence) {
-      allRisks.unshift("Ograniczone metadane w bazie dla tego tytułu");
+      allRisks.unshift(t("risks_label", "Ograniczone metadane w bazie dla tego tytułu"));
     }
 
     const risksHtml = allRisks
@@ -250,10 +343,10 @@ document.addEventListener("DOMContentLoaded", () => {
           <span class="card-year">${year}</span>
         </div>
         <div class="card-match-bar">
-          <span class="match-score-badge" title="Dopasowanie do profilu gustu: ${matchPercent}%">${matchPercent}%</span>
-          ${tmdbRating ? `<span class="rating-badge" title="Średnia ocen społeczności TMDB">★ ${tmdbRating}</span>` : ""}
-          <button class="btn-card-trailer" data-action="trailer" data-id="${rec.id}" title="Obejrzyj oficjalny zwiastun">
-            🎬 Zwiastun
+          <span class="match-score-badge" title="Score: ${matchPercent}%">${matchPercent}%</span>
+          ${tmdbRating ? `<span class="rating-badge" title="TMDB Community Rating">★ ${tmdbRating}</span>` : ""}
+          <button class="btn-card-trailer" data-action="trailer" data-id="${rec.id}" title="${t("btn_trailer", "Zwiastun")}">
+            🎬 ${t("btn_trailer", "Zwiastun")}
           </button>
         </div>
         <div class="card-reason">
@@ -267,16 +360,16 @@ document.addEventListener("DOMContentLoaded", () => {
         ` : ""}
         <div class="card-actions">
           <button class="action-btn btn-accept ${rec.status === "accepted" ? "active" : ""}" data-action="accept" data-id="${rec.id}">
-            ✓ Zaakceptuj
+            ✓ ${t("btn_accept", "Zaakceptuj")}
           </button>
           <button class="action-btn btn-reject ${rec.status === "rejected" ? "active" : ""}" data-action="reject" data-id="${rec.id}">
-            ✗ Odrzuć
+            ✗ ${t("btn_reject", "Odrzuć")}
           </button>
           <button class="action-btn btn-seen ${rec.status === "seen" ? "active" : ""}" data-action="seen" data-id="${rec.id}">
-            👁 Widziałem
+            👁 ${t("btn_seen", "Widziałem")}
           </button>
           <button class="action-btn btn-later ${rec.status === "pending" ? "active" : ""}" data-action="later" data-id="${rec.id}">
-            ⏱ Później
+            ⏱ ${t("btn_later", "Później")}
           </button>
         </div>
       </div>
@@ -287,9 +380,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // Handle User Decision (Accept, Reject, Seen, Later)
   async function handleDecision(recId, decision) {
-    const card = document.getElementById(`rec-card-${recId}`);
-    const originalStatus = state.recommendations.find((r) => r.id === recId)?.status;
-
     try {
       const payload = {
         decisions: [{ recommendation_id: recId, decision }],
@@ -308,19 +398,12 @@ document.addEventListener("DOMContentLoaded", () => {
         else if (decision === "later") target.status = "pending";
       }
 
-      // Re-render card or update elements
       renderRecommendations();
       updateApprovalBar();
 
-      const labels = {
-        accept: "zaakceptowana",
-        reject: "odrzucona",
-        seen: "oznaczona jako obejrzana",
-        later: "odłożona na później",
-      };
-      showToast(`Pozycja została ${labels[decision] || decision}.`, "success");
+      showToast(`${t("toast_decision_saved", "Zapisano decyzję")}: ${decision.toUpperCase()}`, "success");
     } catch (err) {
-      showToast(`Błąd zapisu decyzji: ${err.message}`, "error");
+      showToast(`Error saving decision: ${err.message}`, "error");
     }
   }
 
@@ -331,7 +414,7 @@ document.addEventListener("DOMContentLoaded", () => {
     ).length;
 
     if (acceptedCount > 0) {
-      approvedCountText.textContent = `${acceptedCount} pozycji zaakceptowanych`;
+      approvedCountText.innerHTML = `${acceptedCount} <span>${t("approved_items_count", "pozycji zaakceptowanych")}</span>`;
       approvalBar.classList.remove("hidden");
     } else {
       approvalBar.classList.add("hidden");
@@ -341,13 +424,10 @@ document.addEventListener("DOMContentLoaded", () => {
   // Bulk Approve Accepted Items to Simkl
   async function submitBulkApprove() {
     const acceptedItems = state.recommendations.filter((r) => r.status === "accepted");
-    if (acceptedItems.length === 0) {
-      showToast("Brak zaakceptowanych pozycji do wysłania.", "info");
-      return;
-    }
+    if (acceptedItems.length === 0) return;
 
     btnSubmitApprove.disabled = true;
-    btnSubmitApprove.textContent = "⏳ Wysyłanie do Simkl...";
+    btnSubmitApprove.textContent = `⏳ ${t("toast_approve_submitting", "Wysyłanie do Simkl...")}`;
 
     try {
       const payload = {
@@ -358,7 +438,6 @@ document.addEventListener("DOMContentLoaded", () => {
         body: JSON.stringify(payload),
       });
 
-      // Update local statuses
       res.items.forEach((item) => {
         const found = state.recommendations.find((r) => r.media_item && r.media_item.title === item.title);
         if (found && item.success) {
@@ -368,28 +447,24 @@ document.addEventListener("DOMContentLoaded", () => {
 
       renderRecommendations();
       updateApprovalBar();
-
-      showToast(
-        `Sukces! Dodano ${res.added_count} pozycji do Simkl Plan to Watch (już obecne: ${res.already_added_count}).`,
-        "success"
-      );
+      showToast(t("toast_approve_success", "Pomyślnie dodano do Simkl!"), "success");
     } catch (err) {
-      showToast(`Błąd podczas zapisu do Simkl: ${err.message}`, "error");
+      showToast(`Error: ${err.message}`, "error");
     } finally {
       btnSubmitApprove.disabled = false;
-      btnSubmitApprove.textContent = "🚀 Wyślij zaakceptowane do Simkl";
+      btnSubmitApprove.textContent = `🚀 ${t("btn_submit_approve", "Wyślij zaakceptowane do Simkl")}`;
     }
   }
 
   // Open Taste Profile Modal
   async function openProfileModal() {
     modalProfile.classList.remove("hidden");
-    profileContentContainer.innerHTML = '<p class="loading-text">Ładowanie profilu gustu...</p>';
+    profileContentContainer.innerHTML = `<p class="loading-text">${t("profile_loading", "Ładowanie profilu gustu...")}</p>`;
 
     try {
       const profile = await api("/api/profile");
       state.activeProfile = profile;
-      if (profilePillText) profilePillText.textContent = `Profil: ${profile.version}`;
+      if (profilePillText) profilePillText.textContent = `${t("profile_active", "Profil: Aktywny")}: ${profile.version}`;
 
       const content = profile.content || {};
       const genres = content.genres || [];
@@ -397,68 +472,67 @@ document.addEventListener("DOMContentLoaded", () => {
       const directors = content.directors_or_creators || [];
       const anti = content.anti_preferences || [];
       const temp = content.temporary_interests || [];
-      const createdDate = new Date(profile.created_at).toLocaleString("pl-PL");
+      const localeCode = state.currentLang === "en" ? "en-US" : "pl-PL";
+      const createdDate = new Date(profile.created_at).toLocaleString(localeCode);
 
       profileContentContainer.innerHTML = `
         <div style="margin-bottom: 1rem; padding: 0.75rem 1rem; background: var(--bg-primary); border-radius: var(--radius-sm); border: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem;">
           <div>
-            <strong>Wersja profilu:</strong> <span class="badge badge-profile">${profile.version}</span>
-            <span style="color: var(--text-muted); font-size: 0.85rem; margin-left: 0.5rem;">(Utworzono: ${createdDate})</span>
+            <strong>Version:</strong> <span class="badge badge-profile">${profile.version}</span>
+            <span style="color: var(--text-muted); font-size: 0.85rem; margin-left: 0.5rem;">(${createdDate})</span>
           </div>
-          <div style="font-size: 0.85rem; color: var(--color-success);">● Aktywny</div>
+          <div style="font-size: 0.85rem; color: var(--color-success);">● ${t("profile_active", "Aktywny")}</div>
         </div>
 
-        <div class="profile-section-title">Podsumowanie gustu</div>
+        <div class="profile-section-title">Summary</div>
         <p style="color: var(--text-main); font-size: 0.95rem; line-height: 1.6; background: var(--bg-primary); padding: 0.85rem; border-radius: var(--radius-sm); border: 1px solid var(--border-color);">
-          ${content.summary || "Brak podsumowania."}
+          ${content.summary || "No summary available."}
         </p>
 
-        <div class="profile-section-title">Ulubione gatunki</div>
+        <div class="profile-section-title">Preferred Genres</div>
         <div class="profile-tags-grid">
           ${genres.map(g => `<span class="profile-tag"><strong>${g.name}</strong> <span class="profile-tag-weight">${Math.round(g.weight * 100)}%</span></span>`).join("")}
         </div>
 
-        <div class="profile-section-title">Kluczowe motywy</div>
+        <div class="profile-section-title">Key Themes</div>
         <div class="profile-tags-grid">
           ${themes.map(t => `<span class="profile-tag">🎯 ${t.name} <span class="profile-tag-weight">${Math.round(t.weight * 100)}%</span></span>`).join("")}
         </div>
 
-        <div class="profile-section-title">Preferowani twórcy i reżyserzy</div>
+        <div class="profile-section-title">Favorite Directors & Creators</div>
         <div class="profile-tags-grid">
           ${directors.map(d => `<span class="profile-tag">🎬 ${d}</span>`).join("")}
         </div>
 
         ${anti.length > 0 ? `
-          <div class="profile-section-title" style="color: var(--color-danger);">⛔ Antypreferencje (wykluczenia)</div>
+          <div class="profile-section-title" style="color: var(--color-danger);">⛔ Anti-preferences (Exclusions)</div>
           <div class="profile-tags-grid">
             ${anti.map(a => `<span class="profile-tag" style="border-color: rgba(239, 68, 68, 0.4); color: #fca5a5;">✕ ${a}</span>`).join("")}
           </div>
         ` : ""}
 
         ${temp.length > 0 ? `
-          <div class="profile-section-title" style="color: var(--color-warning);">⏳ Chwilowe zainteresowania</div>
+          <div class="profile-section-title" style="color: var(--color-warning);">⏳ Temporary Interests</div>
           <div class="profile-tags-grid">
             ${temp.map(ti => `<span class="profile-tag">✨ ${ti.name}</span>`).join("")}
           </div>
         ` : ""}
       `;
 
-      btnGenerateProfile.textContent = "🔄 Przelicz profil na nowo (Gemini)";
+      btnGenerateProfile.textContent = t("btn_generate_profile", "⚡ Wygeneruj profil (Gemini)");
     } catch (err) {
       state.activeProfile = null;
-      if (profilePillText) profilePillText.textContent = "Profil: brak";
-
+      if (profilePillText) profilePillText.textContent = t("profile_none", "Profil: Brak");
       profileContentContainer.innerHTML = `
         <div class="empty-state" style="padding: 2rem 1rem;">
           <span style="font-size: 3rem;">🧠</span>
-          <h3 style="margin: 0.75rem 0 0.5rem;">Brak wygenerowanego profilu gustu</h3>
+          <h3 style="margin: 0.75rem 0 0.5rem;">${t("profile_none", "Brak wygenerowanego profilu gustu")}</h3>
           <p style="color: var(--text-muted); max-width: 500px; margin: 0 auto 1.5rem;">
-            Aby generować trafne rekomendacje, system potrzebuje profilu gustu opartego na Twojej bibliotece Simkl.
-            Kliknij przycisk poniżej, aby model Gemini przeanalizował obejrzane pozycje i stworzył Twój profil.
+            Click below to generate a taste profile via Gemini based on your Simkl library.
           </p>
         </div>
       `;
-      btnGenerateProfile.textContent = "⚡ Wygeneruj profil gustu (Gemini)";
+      btnGenerateProfile.textContent = t("btn_generate_profile", "⚡ Wygeneruj profil (Gemini)");
     }
   }
 
@@ -466,16 +540,20 @@ document.addEventListener("DOMContentLoaded", () => {
   async function handleGenerateProfile() {
     btnGenerateProfile.disabled = true;
     const origText = btnGenerateProfile.textContent;
-    btnGenerateProfile.textContent = "⏳ Analiza historii Simkl przez Gemini (ok. 15s)...";
+    btnGenerateProfile.textContent = `⏳ ${t("toast_profile_generating", "Generowanie profilu...")}`;
 
     try {
-      const newProfile = await api("/api/profile/generate", { method: "POST" });
+      const payload = { language: state.currentLang };
+      const newProfile = await api("/api/profile/generate", {
+        method: "POST",
+        body: JSON.stringify(payload),
+      });
       state.activeProfile = newProfile;
-      if (profilePillText) profilePillText.textContent = `Profil: ${newProfile.version}`;
-      showToast(`Pomyślnie wygenerowano profil gustu ${newProfile.version}!`, "success");
+      if (profilePillText) profilePillText.textContent = `${t("profile_active", "Profil: Aktywny")}: ${newProfile.version}`;
+      showToast(t("toast_profile_success", "Nowy profil gustu został pomyślnie wygenerowany!"), "success");
       await openProfileModal();
     } catch (err) {
-      showToast(`Błąd generowania profilu: ${err.message}`, "error");
+      showToast(`Error: ${err.message}`, "error");
     } finally {
       btnGenerateProfile.disabled = false;
       btnGenerateProfile.textContent = origText;
@@ -485,18 +563,19 @@ document.addEventListener("DOMContentLoaded", () => {
   // Open Decision History Modal
   async function openHistoryModal() {
     modalHistory.classList.remove("hidden");
-    historyTableContainer.innerHTML = '<p class="loading-text">Ładowanie historii decyzji...</p>';
+    historyTableContainer.innerHTML = `<p class="loading-text">${t("profile_loading", "Ładowanie...")}</p>`;
 
     try {
       const decisions = await api("/api/recommendations/decisions?limit=50");
       if (!decisions || decisions.length === 0) {
-        historyTableContainer.innerHTML = "<p>Brak zapisanych decyzji.</p>";
+        historyTableContainer.innerHTML = `<p>${t("history_empty", "Brak zapisanych decyzji.")}</p>`;
         return;
       }
 
+      const localeCode = state.currentLang === "en" ? "en-US" : "pl-PL";
       let rowsHtml = decisions
         .map((d) => {
-          const dateStr = new Date(d.created_at).toLocaleString("pl-PL");
+          const dateStr = new Date(d.created_at).toLocaleString(localeCode);
           const decisionBadgeClass =
             d.decision === "accept"
               ? "badge-status-accepted"
@@ -509,7 +588,7 @@ document.addEventListener("DOMContentLoaded", () => {
           return `
             <tr>
               <td>${dateStr}</td>
-              <td><strong>${d.media_title || "Nieznany"}</strong> (${d.media_year || "-"})</td>
+              <td><strong>${d.media_title || "Unknown"}</strong> (${d.media_year || "-"})</td>
               <td><span class="badge ${d.media_type === "movie" ? "badge-movie" : "badge-show"}">${(d.media_type || "").toUpperCase()}</span></td>
               <td><span class="badge ${decisionBadgeClass}">${d.decision.toUpperCase()}</span></td>
               <td>${d.note || "-"}</td>
@@ -522,19 +601,26 @@ document.addEventListener("DOMContentLoaded", () => {
         <table class="history-table">
           <thead>
             <tr>
-              <th>Data</th>
-              <th>Tytuł</th>
-              <th>Typ</th>
-              <th>Decyzja</th>
-              <th>Notatka</th>
+              <th>${t("history_col_date", "Data")}</th>
+              <th>${t("history_col_title", "Tytuł")}</th>
+              <th>${t("history_col_type", "Typ")}</th>
+              <th>${t("history_col_decision", "Decyzja")}</th>
+              <th>Note</th>
             </tr>
           </thead>
           <tbody>${rowsHtml}</tbody>
         </table>
       `;
     } catch (err) {
-      historyTableContainer.innerHTML = `<p style="color: var(--color-danger)">Błąd: ${err.message}</p>`;
+      historyTableContainer.innerHTML = `<p style="color: var(--color-danger)">Error: ${err.message}</p>`;
     }
+  }
+
+  // Language Selector Listener
+  if (langSelect) {
+    langSelect.addEventListener("change", async (e) => {
+      await applyLanguage(e.target.value);
+    });
   }
 
   // Event Listeners
@@ -593,7 +679,6 @@ document.addEventListener("DOMContentLoaded", () => {
   function closeTrailerModal() {
     if (!modalTrailer) return;
     modalTrailer.classList.add("hidden");
-    // Clear iframe to immediately stop playback and audio
     trailerPlayerContainer.innerHTML = "";
     trailerFallbackContainer.classList.add("hidden");
     trailerPlayerContainer.classList.remove("hidden");
@@ -601,12 +686,11 @@ document.addEventListener("DOMContentLoaded", () => {
 
   async function openTrailerModal(recId) {
     const rec = state.recommendations.find((r) => r.id === recId);
-    const title = rec?.media_item?.title || "Zwiastun";
+    const title = rec?.media_item?.title || "Trailer";
     const year = rec?.media_item?.year ? `(${rec.media_item.year})` : "";
-    modalTrailerTitle.textContent = `${title} ${year} — Zwiastun`;
+    modalTrailerTitle.textContent = `${title} ${year} — ${t("modal_trailer_title", "Zwiastun")}`;
 
-    // Clear previous state and show modal with loading spinner
-    trailerPlayerContainer.innerHTML = `<div class="loading-state"><div class="spinner"></div><p>Ładowanie zwiastuna...</p></div>`;
+    trailerPlayerContainer.innerHTML = `<div class="loading-state"><div class="spinner"></div><p>${t("loading_recommendations", "Ładowanie...")}</p></div>`;
     trailerFallbackContainer.classList.add("hidden");
     trailerPlayerContainer.classList.remove("hidden");
     modalTrailer.classList.remove("hidden");
@@ -617,7 +701,6 @@ document.addEventListener("DOMContentLoaded", () => {
       let fallbackUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(`${title} ${year} official trailer`)}`;
 
       if (!trailerKey) {
-        // Fetch on-demand from API
         const data = await api(`/api/recommendations/${recId}/trailer`);
         trailerKey = data.trailer_key;
         trailerUrl = data.trailer_url;
@@ -646,7 +729,6 @@ document.addEventListener("DOMContentLoaded", () => {
         trailerDirectLink.href = trailerUrl || `https://www.youtube.com/watch?v=${trailerKey}`;
         trailerDirectLink.classList.remove("hidden");
       } else {
-        // Show fallback search link
         trailerPlayerContainer.classList.add("hidden");
         trailerFallbackContainer.classList.remove("hidden");
         trailerFallbackLink.href = fallbackUrl;
@@ -657,7 +739,7 @@ document.addEventListener("DOMContentLoaded", () => {
       trailerFallbackContainer.classList.remove("hidden");
       trailerFallbackLink.href = `https://www.youtube.com/results?search_query=${encodeURIComponent(`${title} ${year} official trailer`)}`;
       trailerDirectLink.classList.add("hidden");
-      showToast(`Nie udało się załadować zwiastuna: ${err.message}`, "error");
+      showToast(`Trailer error: ${err.message}`, "error");
     }
   }
 
@@ -667,18 +749,15 @@ document.addEventListener("DOMContentLoaded", () => {
   // Sync Simkl
   btnSync.addEventListener("click", async () => {
     btnSync.disabled = true;
-    btnSync.innerHTML = '<span class="icon">⏳</span> Synchronizacja...';
+    btnSync.innerHTML = `<span class="icon">⏳</span> ${t("toast_sync_started", "Synchronizacja...")}`;
     try {
       const res = await api("/api/sync/simkl", { method: "POST" });
-      showToast(
-        `Synchronizacja zakończona pomyślnie. Dodano: ${res.items_added}, zaktualizowano: ${res.items_updated}.`,
-        "success"
-      );
+      showToast(t("toast_sync_success", "Synchronizacja z Simkl zakończona pomyślnie!"), "success");
     } catch (err) {
-      showToast(`Błąd synchronizacji: ${err.message}`, "error");
+      showToast(`Sync error: ${err.message}`, "error");
     } finally {
       btnSync.disabled = false;
-      btnSync.innerHTML = '<span class="icon">🔄</span> Sync Simkl';
+      btnSync.innerHTML = `<span class="icon">🔄</span> ${t("btn_sync", "Sync Simkl")}`;
     }
   });
 
@@ -700,10 +779,11 @@ document.addEventListener("DOMContentLoaded", () => {
     const movieLimit = Number(document.getElementById("input-movie-limit").value) || 10;
     const showLimit = Number(document.getElementById("input-show-limit").value) || 5;
     const excludeAnim = document.getElementById("input-exclude-animation").checked;
+    const runLang = document.getElementById("input-run-language")?.value || state.currentLang;
 
     const btnSubmit = document.getElementById("btn-submit-run");
     btnSubmit.disabled = true;
-    btnSubmit.textContent = "⏳ Generowanie (może potrwać ok. 30s)...";
+    btnSubmit.textContent = `⏳ ${t("toast_run_generating", "Generowanie...")}`;
 
     try {
       const payload = {
@@ -711,6 +791,7 @@ document.addEventListener("DOMContentLoaded", () => {
         show_limit: showLimit,
         mode: "ondemand",
         exclude_genres: excludeAnim ? ["Animation"] : [],
+        language: runLang,
       };
       const newRun = await api("/api/recommendation-runs", {
         method: "POST",
@@ -718,13 +799,13 @@ document.addEventListener("DOMContentLoaded", () => {
       });
 
       modalNewRun.classList.add("hidden");
-      showToast(`Pomyślnie wygenerowano nową edycję #${newRun.id}!`, "success");
+      showToast(`${t("toast_run_success", "Nowa edycja rekomendacji została wygenerowana!")} #${newRun.id}`, "success");
       await loadRuns();
     } catch (err) {
-      showToast(`Błąd generowania rekomendacji: ${err.message}`, "error");
+      showToast(`Error: ${err.message}`, "error");
     } finally {
       btnSubmit.disabled = false;
-      btnSubmit.textContent = "Uruchom generowanie";
+      btnSubmit.textContent = t("btn_start_generation", "Uruchom generowanie");
     }
   });
 
