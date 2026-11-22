@@ -164,3 +164,15 @@ Ten dokument zawiera historię kluczowych decyzji projektowych, technologicznych
   6. Zintegrowano usługę z Reverse Proxy Caddy (CT 111 `caddy-proxy`) z przypisaniem IP `192.168.1.36` oraz domeną `https://curato.app.witkowski.xyz` i wyłączeniem buforowania (`flush_interval -1`).
   7. Zweryfikowano poprawność certyfikatu SSL, panelu Web UI oraz strumieniowania SSE endpointu MCP (`/mcp/sse`) z poprawną autoryzacją tokenem `MCP_API_KEY`.
 - **Uzasadnienie**: Zakończenie pełnego cyklu wytwórczego i wdrożeniowego projektu: Curato działa stabilnie 24/7 jako mikro-usługa w homelabie z bezpiecznym dostępem dla ChatGPT i Antigravity.
+
+---
+
+### 2026-11-22 — Obsługa Simkl OAuth2 Refresh Token i automatyczne odświeżanie sesji
+- **Decyzja / Zmiana**:
+  1. Zidentyfikowano przyczynę wygasania tokenów Simkl po 7 dniach (standard Simkl Auth V2 ogranicza ważność `access_token` do 7 dni, oferując 180-dniowy `refresh_token` z mechanizmem *sliding window*).
+  2. Zaimplementowano moduł `app/core/tokens.py` do trwałego przechowywania i odczytu tokenów w istniejącej tabeli SQLite `app_settings` (klucz `simkl_auth_tokens`) z automatyczną aktualizacją pliku `.env` w trybie deweloperskim.
+  3. Zaktualizowano `SimklClient` (`app/integrations/simkl.py`) o metodę `refresh_access_token` oraz automatyczną detekcję wygaśnięcia tokena (kod HTTP 401/403) z natychmiastowym transparentnym odświeżeniem i ponowieniem zapytania bez przerywania operacji użytkownika.
+  4. Dodano synchronizację tokenów między procesami/zadaniami w tle za pomocą `asyncio.Lock` oraz detekcję tokenów odświeżonych współbieżnie.
+  5. Rozszerzono skrypt `scripts/get_simkl_token.py` o zapisywanie `refresh_token` do `.env` oraz do tabeli `app_settings` w lokalnej bazie danych SQLite.
+  6. Rozszerzono testy automatyczne do **123 testów** (`pytest`) przechodzących w 100% oraz pełną zgodność lintera `ruff`.
+- **Uzasadnienie**: Wyeliminowanie cyklicznych błędów autoryzacji `Access token has expired` i zapewnienie w pełni bezobsługowej pracy Curato 24/7.

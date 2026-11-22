@@ -152,6 +152,8 @@ def main():
             with urllib.request.urlopen(token_req, timeout=15) as resp:
                 token_resp = json.loads(resp.read().decode("utf-8"))
                 access_token = token_resp.get("access_token")
+                refresh_token = token_resp.get("refresh_token")
+                token_expires_in = token_resp.get("expires_in")
                 if access_token:
                     print("\n\n🎉 Sukces! Otrzymano token autoryzacyjny użytkownika!")
 
@@ -180,14 +182,52 @@ def main():
                         "SIMKL_USER_TOKEN": access_token,
                         "SIMKL_CLIENT_SECRET": client_secret or "",
                     }
+                    if refresh_token:
+                        updates["SIMKL_REFRESH_TOKEN"] = refresh_token
                     if username:
                         updates["SIMKL_USERNAME"] = username
 
                     update_env_file(env_path, updates)
                     print(
                         f"✅ Zaktualizowano {env_path.name} "
-                        f"(ustawiono SIMKL_USER_TOKEN i SIMKL_USERNAME)."
+                        f"(ustawiono SIMKL_USER_TOKEN, SIMKL_REFRESH_TOKEN i SIMKL_USERNAME)."
                     )
+
+                    # Aktualizujemy bazę SQLite, jeśli plik bazy istnieje
+                    db_path = project_root / "data" / "movie_recommend.db"
+                    if db_path.exists():
+                        try:
+                            import sqlite3
+
+                            conn = sqlite3.connect(db_path)
+                            cur = conn.cursor()
+                            payload = json.dumps(
+                                {
+                                    "access_token": access_token,
+                                    "refresh_token": refresh_token,
+                                    "expires_at": (
+                                        time.time() + token_expires_in
+                                        if token_expires_in
+                                        else None
+                                    ),
+                                    "updated_at": time.strftime(
+                                        "%Y-%m-%dT%H:%M:%SZ", time.gmtime()
+                                    ),
+                                }
+                            )
+                            cur.execute(
+                                "INSERT INTO app_settings (key, value_json) VALUES (?, ?) "
+                                "ON CONFLICT(key) DO UPDATE SET value_json=excluded.value_json",
+                                ("simkl_auth_tokens", payload),
+                            )
+                            conn.commit()
+                            conn.close()
+                            print(
+                                "✅ Zaktualizowano tokeny w bazie SQLite (tabela app_settings)."
+                            )
+                        except Exception as dbe:
+                            print(f"[Ostrzeżenie] Nie udało się zapisać do SQLite: {dbe}")
+
                     return
         except urllib.error.HTTPError as e:
             try:

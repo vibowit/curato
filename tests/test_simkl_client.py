@@ -152,3 +152,117 @@ async def test_simkl_client_add_to_list():
     )
     assert result["added"]["movies"] == 1
     assert client.write_calls_count == 1
+
+
+@pytest.mark.asyncio
+async def test_simkl_client_auto_refresh_on_401():
+    calls = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        url_str = str(request.url)
+        calls.append(url_str)
+
+        # 1. First call to /users/settings -> 401 token expired
+        if "users/settings" in url_str and len(calls) == 1:
+            assert request.headers["Authorization"] == "Bearer old_token"
+            return httpx.Response(
+                401,
+                json={"error": "invalid_token", "message": "Access token has expired"},
+            )
+
+        # 2. Token refresh request
+        if "oauth2/token" in url_str:
+            assert request.method == "POST"
+            assert request.headers["simkl-api-key"] == "test_client_id"
+            content = request.content.decode("utf-8")
+            assert "grant_type=refresh_token" in content
+            assert "refresh_token=old_refresh" in content
+            return httpx.Response(
+                200,
+                json={
+                    "access_token": "new_refreshed_token",
+                    "refresh_token": "new_rotated_refresh",
+                    "expires_in": 604800,
+                    "token_type": "Bearer",
+                },
+            )
+
+        # 3. Retried call to /users/settings with new token
+        if "users/settings" in url_str and len(calls) == 3:
+            assert request.headers["Authorization"] == "Bearer new_refreshed_token"
+            return httpx.Response(200, json={"user": {"name": "auto_refreshed_user"}})
+
+        return httpx.Response(500, text="Unexpected request")
+
+    transport = httpx.MockTransport(handler)
+    client = SimklClient(
+        client_id="test_client_id",
+        user_token="old_token",
+        refresh_token="old_refresh",
+        transport=transport,
+    )
+
+    settings_resp = await client.get_user_settings()
+    assert settings_resp["user"]["name"] == "auto_refreshed_user"
+    assert client.user_token == "new_refreshed_token"
+    assert client.refresh_token == "new_rotated_refresh"
+    assert len(calls) == 3
+
+
+@pytest.mark.asyncio
+async def test_simkl_client_refresh_failure_raises_auth_error():
+    calls = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        url_str = str(request.url)
+        calls.append(url_str)
+
+        if "users/settings" in url_str:
+            return httpx.Response(401, json={"error": "invalid_token"})
+
+        if "oauth2/token" in url_str:
+            return httpx.Response(400, json={"error": "invalid_grant", "message": "Token expired"})
+
+        return httpx.Response(500, text="Unexpected")
+
+    transport = httpx.MockTransport(handler)
+    client = SimklClient(
+        client_id="test_client_id",
+        user_token="old_token",
+        refresh_token="expired_refresh",
+        transport=transport,
+    )
+
+    with pytest.raises(SimklAuthError) as exc_info:
+        await client.get_user_settings()
+    assert exc_info.value.code == "AUTH_REQUIRED"
+    assert len(calls) == 2
+
+
+@pytest.mark.asyncio
+async def test_simkl_client_loads_tokens_from_app_settings():
+    from sqlalchemy import delete
+
+    from app.core.database import SessionLocal
+    from app.core.tokens import SIMKL_TOKENS_SETTING_KEY, save_stored_simkl_tokens
+    from app.models.settings import AppSetting
+
+    try:
+        # Persist mock tokens in app_settings table
+        save_stored_simkl_tokens(
+            access_token="db_access_token",
+            refresh_token="db_refresh_token",
+            expires_in=3600,
+        )
+
+        # Initialize client without passing explicit tokens
+        client = SimklClient(client_id="test_client_id")
+        assert client.user_token == "db_access_token"
+        assert client.refresh_token == "db_refresh_token"
+    finally:
+        with SessionLocal() as session:
+            session.execute(
+                delete(AppSetting).where(AppSetting.key == SIMKL_TOKENS_SETTING_KEY)
+            )
+            session.commit()
+

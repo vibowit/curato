@@ -64,3 +64,4 @@ htmlcov/
 # Private homelab deployment notes
 docs/deploy-*.md
 docs/private/
+known_hosts

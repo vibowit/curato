@@ -7,6 +7,7 @@ from typing import Any, Dict, List, Optional
 import httpx
 
 from app.core.config import settings
+from app.core.tokens import get_stored_simkl_tokens, save_stored_simkl_tokens
 
 logger = logging.getLogger(__name__)
 
@@ -54,6 +55,8 @@ class SimklClient:
         self,
         client_id: Optional[str] = None,
         user_token: Optional[str] = None,
+        refresh_token: Optional[str] = None,
+        client_secret: Optional[str] = None,
         base_url: Optional[str] = None,
         timeout: Optional[float] = None,
         transport: Optional[httpx.AsyncBaseTransport] = None,
@@ -62,10 +65,33 @@ class SimklClient:
         self.client_id = client_id or (
             settings.SIMKL_CLIENT_ID.get_secret_value() if settings.SIMKL_CLIENT_ID else None
         )
-        self.user_token = user_token or (
-            settings.effective_simkl_token.get_secret_value()
-            if settings.effective_simkl_token
+        self.client_secret = client_secret or (
+            settings.SIMKL_CLIENT_SECRET.get_secret_value()
+            if settings.SIMKL_CLIENT_SECRET
             else None
+        )
+
+        stored_tokens = get_stored_simkl_tokens()
+        stored_access = stored_tokens.get("access_token") if stored_tokens else None
+        stored_refresh = stored_tokens.get("refresh_token") if stored_tokens else None
+
+        self.user_token = (
+            user_token
+            or stored_access
+            or (
+                settings.effective_simkl_token.get_secret_value()
+                if settings.effective_simkl_token
+                else None
+            )
+        )
+        self.refresh_token = (
+            refresh_token
+            or stored_refresh
+            or (
+                settings.effective_simkl_refresh_token.get_secret_value()
+                if settings.effective_simkl_refresh_token
+                else None
+            )
         )
         self.base_url = (base_url or settings.SIMKL_BASE_URL).rstrip("/")
         self.timeout = timeout or settings.SIMKL_TIMEOUT_SECONDS
@@ -80,6 +106,8 @@ class SimklClient:
 
         # Safety invariant tracker
         self.write_calls_count: int = 0
+        self._refresh_lock = asyncio.Lock()
+        self._initialized_at = datetime.now(timezone.utc).isoformat()
 
     def _get_headers(self) -> Dict[str, str]:
         headers = {
@@ -91,6 +119,83 @@ class SimklClient:
         if self.user_token:
             headers["Authorization"] = f"Bearer {self.user_token}"
         return headers
+
+    async def refresh_access_token(self) -> bool:
+        """
+        Refreshes expired access_token using OAuth 2.0 refresh_token (grant_type=refresh_token).
+        Updates in-memory state and persists the new tokens to database.
+        """
+        if not self.refresh_token or not self.client_id:
+            logger.warning("Simkl token refresh aborted: missing refresh_token or client_id.")
+            return False
+
+        async with self._refresh_lock:
+            # Check if another task/process already refreshed tokens in the database
+            latest_stored = get_stored_simkl_tokens()
+            if (
+                latest_stored
+                and latest_stored.get("access_token")
+                and latest_stored.get("access_token") != self.user_token
+                and latest_stored.get("updated_at")
+                and latest_stored["updated_at"] > self._initialized_at
+            ):
+                self.user_token = latest_stored["access_token"]
+                self.refresh_token = latest_stored.get("refresh_token") or self.refresh_token
+                self._initialized_at = latest_stored["updated_at"]
+                logger.info(
+                    "Simkl access token updated from concurrently refreshed database state."
+                )
+                return True
+
+            token_url = f"{self.base_url}/oauth2/token"
+            headers = {
+                "Content-Type": "application/x-www-form-urlencoded",
+                "simkl-api-key": self.client_id,
+                "User-Agent": f"PersonalMovieRecommender/{settings.VERSION}",
+            }
+            form_data = {
+                "grant_type": "refresh_token",
+                "client_id": self.client_id,
+                "refresh_token": self.refresh_token,
+            }
+            if self.client_secret:
+                form_data["client_secret"] = self.client_secret
+
+            try:
+                await self._throttle("POST")
+                async with httpx.AsyncClient(
+                    transport=self.transport,
+                    timeout=self.timeout,
+                ) as client:
+                    resp = await client.post(token_url, headers=headers, data=form_data)
+
+                if resp.status_code == 200:
+                    data = resp.json()
+                    new_access = data.get("access_token")
+                    new_refresh = data.get("refresh_token") or self.refresh_token
+                    expires_in = data.get("expires_in")
+
+                    if new_access:
+                        self.user_token = new_access
+                        self.refresh_token = new_refresh
+                        save_stored_simkl_tokens(
+                            access_token=new_access,
+                            refresh_token=new_refresh,
+                            expires_in=expires_in,
+                        )
+                        self._initialized_at = datetime.now(timezone.utc).isoformat()
+                        logger.info("Successfully refreshed Simkl access token.")
+                        return True
+
+                logger.error(
+                    "Simkl token refresh failed (HTTP %d): %s",
+                    resp.status_code,
+                    resp.text,
+                )
+                return False
+            except Exception as e:
+                logger.error("Exception during Simkl token refresh: %s", e)
+                return False
 
     async def _throttle(self, method: str) -> None:
         """Enforces rate limiting between consecutive calls."""
@@ -112,6 +217,7 @@ class SimklClient:
         path: str,
         params: Optional[Dict[str, Any]] = None,
         json_data: Optional[Dict[str, Any]] = None,
+        _is_retry: bool = False,
     ) -> Any:
         url = f"{self.base_url}/{path.lstrip('/')}"
         headers = self._get_headers()
@@ -138,6 +244,20 @@ class SimklClient:
                     return response.json()
 
                 if response.status_code in (401, 403):
+                    if not _is_retry and self.refresh_token:
+                        logger.info(
+                            "Simkl auth returned HTTP %d. Attempting token refresh...",
+                            response.status_code,
+                        )
+                        refreshed = await self.refresh_access_token()
+                        if refreshed:
+                            return await self._request(
+                                method=method,
+                                path=path,
+                                params=params,
+                                json_data=json_data,
+                                _is_retry=True,
+                            )
                     msg = f"Simkl auth failed (HTTP {response.status_code}): {response.text}"
                     raise SimklAuthError(msg)
 

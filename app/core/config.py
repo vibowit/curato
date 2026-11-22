@@ -20,6 +20,7 @@ class Settings(BaseSettings):
     SIMKL_CLIENT_SECRET: SecretStr | None = None
     SIMKL_ACCESS_TOKEN: SecretStr | None = None
     SIMKL_USER_TOKEN: SecretStr | None = None
+    SIMKL_REFRESH_TOKEN: SecretStr | None = None
     SIMKL_USERNAME: str | None = None
     SIMKL_BASE_URL: str = "https://api.simkl.com"
     SIMKL_TIMEOUT_SECONDS: float = 15.0
@@ -28,6 +29,11 @@ class Settings(BaseSettings):
     def effective_simkl_token(self) -> SecretStr | None:
         """Returns SIMKL_USER_TOKEN if set, otherwise SIMKL_ACCESS_TOKEN."""
         return self.SIMKL_USER_TOKEN or self.SIMKL_ACCESS_TOKEN
+
+    @property
+    def effective_simkl_refresh_token(self) -> SecretStr | None:
+        """Returns SIMKL_REFRESH_TOKEN if set."""
+        return self.SIMKL_REFRESH_TOKEN
 
     # LLM Provider (Google Gemini)
     GEMINI_API_KEY: SecretStr | None = None
