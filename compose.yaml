@@ -3,14 +3,11 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    image: curato:latest
+    image: git.app.witkowski.xyz/vibowit/curato:latest
     container_name: curato
     restart: unless-stopped
     ports:
       - "8000:8000"
-    environment:
-      - ENVIRONMENT=production
-      - SQLITE_DB_PATH=/app/data/movie_recommend.db
     env_file:
       - .env
     volumes:

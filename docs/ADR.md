@@ -176,3 +176,12 @@ Ten dokument zawiera historię kluczowych decyzji projektowych, technologicznych
   5. Rozszerzono skrypt `scripts/get_simkl_token.py` o zapisywanie `refresh_token` do `.env` oraz do tabeli `app_settings` w lokalnej bazie danych SQLite.
   6. Rozszerzono testy automatyczne do **123 testów** (`pytest`) przechodzących w 100% oraz pełną zgodność lintera `ruff`.
 - **Uzasadnienie**: Wyeliminowanie cyklicznych błędów autoryzacji `Access token has expired` i zapewnienie w pełni bezobsługowej pracy Curato 24/7.
+
+---
+
+### 2026-11-22 — Parytet mediów (filmy/seriale) i elastyczny resolver pojęć zewnętrznych API
+- **Decyzja / Zmiana**:
+  1. Wprowadzono bezwzględną zasadę architektoniczną parytetu mediów: filmy (`movie`) i seriale (`show`) muszą być traktowane w silniku rekomendacji symetrycznie, z niezależnymi pulami i zapytaniami.
+  2. Zidentyfikowano przyczynę zaniżonych ocen seriali (maks. 45–48%): zdominowanie puli ulubionych przez filmy (wypieranie seriali ze Strategii A), brak pobierania dorobku serialowego twórców w Strategii C oraz ciche gubienie złożonych nazw gatunków z profilu LLM (np. `Action/Thriller`, `History/War`) przy braku odpowiedników 1:1 w słowniku TMDB TV.
+  3. Zdecydowano o rozszerzeniu `TMDBClient` o `/person/{id}/tv_credits`, wdrożeniu dedykowanego helpera `resolve_tmdb_genre_ids` (tokenizacja, synonimy, mapowanie per typ mediów) oraz rozdzieleniu pobierania ulubionych w `DiscoveryService` na niezależne pule filmów i seriali.
+- **Uzasadnienie**: Zapewnienie wysokiej jakości propozycji serialowych dla użytkowników o nasyconej bibliotece (ponad 180 obejrzanych seriali) i wyeliminowanie problemu sztucznego obniżania ocen semantycznych przez niedopasowanych kandydatów.

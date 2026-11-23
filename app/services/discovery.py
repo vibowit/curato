@@ -11,6 +11,7 @@ from app.integrations.tmdb import (
     TMDB_TV_GENRES,
     TMDBAuthError,
     TMDBClient,
+    resolve_tmdb_genre_ids,
 )
 from app.models.history import WatchHistory
 from app.models.media import MediaItem
@@ -99,19 +100,55 @@ class DiscoveryService:
             source_strategy=strategy,
         )
 
-    async def get_favorites_from_db(self, db: Session, limit: int = 15) -> List[MediaItem]:
-        """Fetches user's top-rated or completed items with TMDB IDs from local database."""
-        stmt = (
-            select(MediaItem)
-            .join(WatchHistory, MediaItem.id == WatchHistory.media_item_id)
-            .where(
-                MediaItem.tmdb_id.is_not(None),
-                (WatchHistory.user_rating >= 7.5) | (WatchHistory.status == "completed"),
+    async def get_favorites_from_db(
+        self,
+        db: Session,
+        limit: int = 15,
+        movie_limit: Optional[int] = None,
+        show_limit: Optional[int] = None,
+    ) -> List[MediaItem]:
+        """Fetches user's top-rated or completed items with TMDB IDs from local database,
+
+        balancing movies and TV shows so neither starves the discovery pool.
+        """
+        if movie_limit is None and show_limit is None:
+            movie_limit = max(1, limit // 2)
+            show_limit = max(1, limit - movie_limit)
+        elif movie_limit is None:
+            movie_limit = max(0, limit - (show_limit or 0))
+        elif show_limit is None:
+            show_limit = max(0, limit - (movie_limit or 0))
+
+        def query_type(m_type: str, sub_limit: int) -> List[MediaItem]:
+            if sub_limit <= 0:
+                return []
+            stmt = (
+                select(MediaItem)
+                .join(WatchHistory, MediaItem.id == WatchHistory.media_item_id)
+                .where(
+                    MediaItem.tmdb_id.is_not(None),
+                    MediaItem.media_type == m_type,
+                    (WatchHistory.user_rating >= 7.5) | (WatchHistory.status == "completed"),
+                )
+                .order_by(desc(WatchHistory.user_rating), desc(WatchHistory.watched_at))
+                .limit(sub_limit)
             )
-            .order_by(desc(WatchHistory.user_rating), desc(WatchHistory.watched_at))
-            .limit(limit)
-        )
-        return list(db.execute(stmt).scalars().all())
+            return list(db.execute(stmt).scalars().all())
+
+        fav_movies = query_type("movie", movie_limit)
+        fav_shows = query_type("show", show_limit)
+
+        # Backfill if one type has fewer items than allocated
+        if len(fav_movies) < movie_limit and show_limit > 0:
+            extra = movie_limit - len(fav_movies)
+            additional_shows = query_type("show", show_limit + extra)
+            fav_shows = additional_shows
+        elif len(fav_shows) < show_limit and movie_limit > 0:
+            extra = show_limit - len(fav_shows)
+            additional_movies = query_type("movie", movie_limit + extra)
+            fav_movies = additional_movies
+
+        return fav_movies + fav_shows
 
     async def discover_candidates(
         self,
@@ -220,29 +257,81 @@ class DiscoveryService:
             return []
 
         for genre in top_genres:
-            g_name = genre.name.lower()
-            if g_name in TMDB_MOVIE_GENRES:
-                tasks.append(fetch_genre_movies(g_name, str(TMDB_MOVIE_GENRES[g_name])))
-            if g_name in TMDB_TV_GENRES:
-                tasks.append(fetch_genre_shows(g_name, str(TMDB_TV_GENRES[g_name])))
+            movie_genre_ids = resolve_tmdb_genre_ids(genre.name, media_type="movie")
+            if movie_genre_ids:
+                tasks.append(
+                    fetch_genre_movies(genre.name, "|".join(str(gid) for gid in movie_genre_ids))
+                )
+            show_genre_ids = resolve_tmdb_genre_ids(genre.name, media_type="show")
+            if show_genre_ids:
+                tasks.append(
+                    fetch_genre_shows(genre.name, "|".join(str(gid) for gid in show_genre_ids))
+                )
 
         # 4. Strategy C: Favorite directors and creators (15%)
-        async def fetch_creator_movies(creator: str) -> List[Optional[CandidateItem]]:
+        async def fetch_creator_candidates(creator: str) -> List[Optional[CandidateItem]]:
             async with sem:
                 try:
                     person_res = await self.tmdb.search_person(creator)
                     persons = person_res.get("results", [])
-                    if persons:
-                        person_id = persons[0]["id"]
-                        crew_res = await self.tmdb.discover_movies(
-                            with_crew=str(person_id),
-                            without_genres=movie_without_ids or None,
-                            vote_count_gte=30,
-                        )
-                        return [
-                            self._normalize_movie(item, strategy="director", director=creator)
-                            for item in crew_res.get("results", [])[:5]
-                        ]
+                    if not persons:
+                        return []
+                    person_id = persons[0]["id"]
+
+                    creator_items: List[Optional[CandidateItem]] = []
+
+                    # 4a. Movies directed/created by creator
+                    crew_res = await self.tmdb.discover_movies(
+                        with_crew=str(person_id),
+                        without_genres=movie_without_ids or None,
+                        vote_count_gte=30,
+                    )
+                    creator_items.extend(
+                        self._normalize_movie(item, strategy="director", director=creator)
+                        for item in crew_res.get("results", [])[:5]
+                    )
+
+                    # 4b. TV shows created/written/directed/executive-produced by creator
+                    tv_credits = await self.tmdb.get_person_tv_credits(person_id)
+                    crew = tv_credits.get("crew", [])
+                    relevant_jobs = {
+                        "creator",
+                        "director",
+                        "writer",
+                        "executive producer",
+                        "showrunner",
+                    }
+                    relevant_depts = {"directing", "writing", "production", "creator"}
+
+                    shows_by_id: Dict[int, Dict[str, Any]] = {}
+                    for item in crew:
+                        job = str(item.get("job", "")).lower()
+                        dept = str(item.get("department", "")).lower()
+                        if job in relevant_jobs or dept in relevant_depts:
+                            s_id = item.get("id")
+                            if s_id and s_id not in shows_by_id:
+                                if item.get("vote_count", 0) >= 20:
+                                    g_ids = item.get("genre_ids", [])
+                                    if without_genres_set and any(
+                                        TMDB_GENRE_NAMES.get(gid, "").lower() in without_genres_set
+                                        for gid in g_ids
+                                    ):
+                                        continue
+                                    shows_by_id[s_id] = item
+
+                    sorted_shows = sorted(
+                        shows_by_id.values(),
+                        key=lambda x: (
+                            float(x.get("vote_average", 0.0)),
+                            float(x.get("popularity", 0.0)),
+                        ),
+                        reverse=True,
+                    )
+                    creator_items.extend(
+                        self._normalize_show(item, strategy="director", creator=creator)
+                        for item in sorted_shows[:5]
+                    )
+                    return creator_items
                 except TMDBAuthError:
                     raise
                 except Exception as e:
@@ -250,7 +339,7 @@ class DiscoveryService:
             return []
 
         for creator in profile.directors_or_creators[:4]:
-            tasks.append(fetch_creator_movies(creator))
+            tasks.append(fetch_creator_candidates(creator))
 
         # 5. Strategy D: Exploration (10%) - high quality items
         async def fetch_exploration_movies() -> List[Optional[CandidateItem]]:

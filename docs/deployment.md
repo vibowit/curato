@@ -114,7 +114,7 @@ exec "$@"
 
 ---
 
-## 4. Konfiguracja `docker-compose.yml`
+## 4. Konfiguracja `compose.yaml` (oraz `compose.stage.yaml`)
 
 ```yaml
 version: "3.8"

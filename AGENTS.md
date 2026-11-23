@@ -18,17 +18,20 @@ Przed większą zmianą przeczytaj kluczowe dokumenty projektowe w `docs/`:
 -   Dostępność streamingowa jest poza zakresem.
 -   Nie twórz własnego katalogu filmów ani nie wprowadzaj ML/embeddingów
     bez uzasadnienia i decyzji użytkownika.
+-   Parytet mediów: wszelkie strategie generowania kandydatów, dobór ulubionych
+    oraz zapytania o twórców/showrunnerów muszą traktować filmy (`movie`)
+    i seriale (`show`) symetrycznie, w dedykowanych, zrównoważonych pulach.
 -   Strategia repozytorium i publikacji:
-    -   GitHub jest jedynym kanonicznym źródłem prawdy (`origin`), udostępnianym publicznie jako portfolio/showcase bez obsługi zgłoszeń (Issues i PRs wyłączone).
+    -   Gitea (`git.app.witkowski.xyz`) jest głównym repozytorium deweloperskim (`origin`) w homelabie, zintegrowanym z Gitea Actions i Gitea Container Registry.
+    -   GitHub (`github.com/vibowit/curato`) jest publicznym portfolio/showcase zasilanym automatycznie przez wbudowany Push Mirror w Gitea.
     -   Brak sztucznych PR-ów: nie twórz PR-ów tylko po to, by mieć je w historii.
-    -   Pracuj na gałęzi `main` przy drobnych poprawkach; używaj gałęzi i PR-ów przy większych funkcjach.
-    -   GitHub Release twórz po sprawdzonym, sensownym zestawie zmian.
-    -   Własna instancja Gitea działa wyłącznie jako w 100% pasywny mirror (Pull Mirror) pod backup i deployment w sieci LAN (Proxmox).
-    -   Rezygnacja z publikacji na Docker Hub; obrazy budowane są lokalnie na serwerze docelowym (lub GHCR).
+    -   Pracuj na gałęzi `main` przy drobnych poprawkach (automatyczny deploy na środowisko Stage); używaj gałęzi i PR-ów przy większych funkcjach.
+    -   GitHub Release / Tag `v*.*.*` twórz po sprawdzonym, sensownym zestawie zmian (automatyczny deploy na środowisko Prod).
+    -   Rezygnacja z publikacji na Docker Hub; obrazy publikowane są w prywatnym Gitea Container Registry.
 
 ## Wdrażanie i Docker (Proxmox LXC & SQLite WAL)
 
--   Przy wszelkich pracach związanych z `Dockerfile`, `docker-compose.yml`, skryptem `scripts/entrypoint.sh`, uprawnieniami wolumenów SQLite (UID 1000) oraz konfiguracją Reverse Proxy (Nginx/Caddy) dla streamingu SSE serwera MCP (ChatGPT), **bezwzględnie przeczytaj i stosuj procedury z [docs/deployment.md](docs/deployment.md)** oraz [docs/deploy-r2d2.md](docs/deploy-r2d2.md).
+-   Przy wszelkich pracach związanych z `Dockerfile`, `compose.yaml`, `compose.stage.yaml`, skryptem `scripts/entrypoint.sh`, uprawnieniami wolumenów SQLite (UID 1000) oraz konfiguracją Reverse Proxy (Nginx/Caddy) dla streamingu SSE serwera MCP (ChatGPT), **bezwzględnie przeczytaj i stosuj procedury z [docs/deployment.md](docs/deployment.md)** oraz [docs/deploy-r2d2.md](docs/deploy-r2d2.md).
 
 ## Zasady implementacji
 
@@ -42,6 +45,9 @@ Przed większą zmianą przeczytaj kluczowe dokumenty projektowe w `docs/`:
 -   Obsługuj timeouty, limity API, retry z backoffem i błędy częściowe.
 -   Nie zakładaj poprawności niezweryfikowanych endpointów; sprawdź
     aktualną dokumentację i zapisz potwierdzone decyzje.
+-   Mapowanie metadanych i cech LLM na zewnętrzne API (np. TMDB) musi być
+    elastyczne (tokenizacja separatorów, synonimy, rozróżnienie typów mediów);
+    nigdy nie zakładaj dosłownej zgodności stringów z promptu ze słownikami API.
 -   Zero nieautoryzowanych zależności: nie dodawaj nowych bibliotek bez
     wyraźnej dyspozycji użytkownika.
 -   Współbieżność i SQLite: zadania w tle oraz równoległe korutyny muszą

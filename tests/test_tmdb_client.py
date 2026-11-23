@@ -6,6 +6,7 @@ from app.integrations.tmdb import (
     TMDBClient,
     TMDBRateLimitError,
     TMDBUpstreamError,
+    resolve_tmdb_genre_ids,
 )
 
 
@@ -201,3 +202,61 @@ async def test_tmdb_default_language():
     client = TMDBClient(api_key="test_key", transport=transport, default_language="pl-PL")
     await client.discover_movies()
     assert captured_params.get("language") == "pl-PL"
+
+
+@pytest.mark.asyncio
+async def test_tmdb_client_get_person_tv_credits():
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert "/person/12345/tv_credits" in str(request.url)
+        return httpx.Response(
+            200,
+            json={
+                "id": 12345,
+                "cast": [],
+                "crew": [
+                    {
+                        "id": 82856,
+                        "name": "Mindhunter",
+                        "job": "Executive Producer",
+                        "department": "Production",
+                        "vote_average": 8.1,
+                        "vote_count": 2100,
+                    }
+                ],
+            },
+        )
+
+    transport = httpx.MockTransport(handler)
+    client = TMDBClient(api_key="test_key", transport=transport)
+    credits = await client.get_person_tv_credits(12345)
+    assert credits["id"] == 12345
+    assert len(credits["crew"]) == 1
+    assert credits["crew"][0]["name"] == "Mindhunter"
+
+
+def test_resolve_tmdb_genre_ids():
+    # Direct match
+    assert resolve_tmdb_genre_ids("Crime", "movie") == [80]
+    assert resolve_tmdb_genre_ids("Crime", "show") == [80]
+    assert resolve_tmdb_genre_ids("Drama", "movie") == [18]
+    assert resolve_tmdb_genre_ids("Drama", "show") == [18]
+
+    # Compound slash / separator
+    # Action/Thriller -> Movie: Action (28), Thriller (53)
+    assert resolve_tmdb_genre_ids("Action/Thriller", "movie") == [28, 53]
+    # Action/Thriller -> Show: Action & Adventure (10759), Mystery/Thriller (9648)
+    assert resolve_tmdb_genre_ids("Action/Thriller", "show") == [10759, 9648]
+
+    # History/War -> Movie: History (36), War (10752)
+    assert resolve_tmdb_genre_ids("History/War", "movie") == [36, 10752]
+    # History/War -> Show: War & Politics (10768) - deduplicated!
+    assert resolve_tmdb_genre_ids("History/War", "show") == [10768]
+
+    # Sci-Fi & Fantasy
+    assert resolve_tmdb_genre_ids("Sci-Fi & Fantasy", "show") == [10765]
+    assert resolve_tmdb_genre_ids("Sci-Fi & Fantasy", "movie") == [878, 14]
+
+    # Delimiters with whitespace, commas, pipes
+    assert resolve_tmdb_genre_ids("Crime, Mystery | Drama", "show") == [80, 9648, 18]
+    assert resolve_tmdb_genre_ids("UnknownGenreXYZ", "movie") == []
+

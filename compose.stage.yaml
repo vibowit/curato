@@ -1,0 +1,11 @@
+services:
+  curato-stage:
+    image: git.app.witkowski.xyz/vibowit/curato:stage
+    container_name: curato-stage
+    restart: unless-stopped
+    ports:
+      - "8001:8000"
+    env_file:
+      - .env
+    volumes:
+      - ./data:/app/data

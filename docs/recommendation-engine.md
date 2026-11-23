@@ -20,9 +20,11 @@ oceniane lub najpopularniejsze.
 
 ## Źródła kandydatów
 
-Początkowa pula może łączyć: - dopasowanie do cech profilu, - tytuły
-podobne do wysoko ocenionych, - twórców/obsadę i słowa kluczowe, -
-odkrywanie spoza dominujących gatunków.
+Początkowa pula łączy 4 strategie odkrywania, z zachowaniem bezwzględnego parytetu mediów (`movie` vs `show`):
+- **Podobne do ulubionych (Strategy A)**: pobiera niezależnie ulubione filmy oraz ulubione seriale użytkownika (osobne pule), aby zapobiec wypieraniu seriali przez filmy.
+- **Preferencje gatunkowe (Strategy B)**: elastyczny resolver pojęć (`resolve_tmdb_genre_ids`) mapuje nazwy profilu (w tym złożone np. `Action/Thriller`, `History/War`) na właściwe identyfikatory TMDB osobno dla filmów i dla seriali.
+- **Ulubieni twórcy (Strategy C)**: odpytuje TMDB zarówno o filmy, jak i o dorobek serialowy (`tv_credits`) reżyserów i showrunnerów.
+- **Eksploracja (Strategy D)**: wysokiej jakości pozycje spoza dominujących gatunków dla obu typów mediów.
 
 Udziały źródeł są parametrami konfiguracyjnymi, nie twardymi regułami.
 

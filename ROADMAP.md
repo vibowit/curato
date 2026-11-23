@@ -118,6 +118,16 @@ historii. (Ukończono pomyślnie)
 
 **Akceptacja:** Użytkownik może dynamicznie przełączać język interfejsu (PL/EN), generować rekomendacje w wybranym języku oraz zdefiniować własny język poprzez dodanie pojedynczego pliku JSON. (Ukończono pomyślnie)
 
+## Etap 10 -- Poprawa jakości i puli rekomendacji seriali (W trakcie)
+
+Szczegółowy plan techniczny: patrz [docs/plans/plan-seriale-jakosc-rekomendacji.md](docs/plans/plan-seriale-jakosc-rekomendacji.md).
+
+-   [ ] Faza 1: Rozszerzenie klienta TMDB (`get_person_tv_credits`) oraz elastyczny resolver złożonych nazw gatunków (`resolve_tmdb_genre_ids`).
+-   [ ] Faza 2: Zrównoważenie puli ulubionych w bazie (osobne limity dla filmów i seriali) oraz wyszukiwanie seriali twórców (`fetch_creator_shows`) w `DiscoveryService`.
+-   [ ] Faza 3: Testy jednostkowe z `httpx.MockTransport`, weryfikacja end-to-end, linting `ruff` i ocena jakości proponowanych seriali.
+
+**Akceptacja:** Wygenerowana pula kandydatów serialowych zawiera tytuły odzwierciedlające preferencje użytkownika (kryminał, dramat, twórcy z profilu), eliminując problem sztucznie zaniżonych ocen semantycznych.
+
 ## Przyszłe rozszerzenia (Future Backlog)
 
 -   Powiadomienia Pushover / Telegram o wygenerowaniu nowej edycji przez scheduler.

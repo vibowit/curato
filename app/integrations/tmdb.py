@@ -1,7 +1,7 @@
 import asyncio
 import logging
 import time
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 import httpx
 
@@ -76,6 +76,96 @@ TMDB_GENRE_NAMES: Dict[int, str] = {
     10767: "Talk",
     10768: "War & Politics",
 }
+
+
+def resolve_tmdb_genre_ids(genre_name: str, media_type: str = "movie") -> List[int]:
+    """Resolves complex or compound genre names (e.g. 'Action/Thriller', 'History/War')
+
+    into valid TMDB genre IDs for either 'movie' or 'show' ('tv').
+    """
+    normalized = genre_name.strip().lower()
+    is_tv = media_type.lower() in ("show", "tv")
+    target_dict = TMDB_TV_GENRES if is_tv else TMDB_MOVIE_GENRES
+    if normalized in target_dict:
+        return [target_dict[normalized]]
+
+    # Map of tokens for TV shows
+    tv_token_map: Dict[str, int] = {
+        "action": 10759,
+        "adventure": 10759,
+        "animation": 16,
+        "comedy": 35,
+        "crime": 80,
+        "documentary": 99,
+        "drama": 18,
+        "mystery": 9648,
+        "thriller": 9648,
+        "sci-fi": 10765,
+        "science fiction": 10765,
+        "fantasy": 10765,
+        "war": 10768,
+        "politics": 10768,
+        "history": 10768,
+        "western": 37,
+    }
+
+    # Map of tokens for movies
+    movie_token_map: Dict[str, int] = {
+        "action": 28,
+        "adventure": 12,
+        "animation": 16,
+        "comedy": 35,
+        "crime": 80,
+        "documentary": 99,
+        "drama": 18,
+        "family": 10751,
+        "fantasy": 14,
+        "history": 36,
+        "horror": 27,
+        "music": 10402,
+        "mystery": 9648,
+        "romance": 10749,
+        "sci-fi": 878,
+        "science fiction": 878,
+        "thriller": 53,
+        "war": 10752,
+        "western": 37,
+    }
+
+    token_map = tv_token_map if is_tv else movie_token_map
+
+    # Tokenize by common delimiters: /, &, +, -, comma, pipe, or ' and '
+    delimiters = ["/", "&", "+", ",", "|", " and "]
+    raw_tokens = [normalized]
+    for delim in delimiters:
+        new_tokens = []
+        for t in raw_tokens:
+            new_tokens.extend(t.split(delim))
+        raw_tokens = new_tokens
+
+    resolved_ids: List[int] = []
+    for token in raw_tokens:
+        clean_token = token.strip()
+        if not clean_token:
+            continue
+        if clean_token in token_map:
+            resolved_ids.append(token_map[clean_token])
+            continue
+        # Substring / partial lookup
+        for key, gid in token_map.items():
+            if key in clean_token or clean_token in key:
+                resolved_ids.append(gid)
+                break
+
+    # Deduplicate while preserving order
+    seen: set[int] = set()
+    unique_ids: List[int] = []
+    for gid in resolved_ids:
+        if gid not in seen:
+            seen.add(gid)
+            unique_ids.append(gid)
+
+    return unique_ids
 
 
 class TMDBError(Exception):
@@ -355,6 +445,10 @@ class TMDBClient:
     async def get_person_movie_credits(self, person_id: int) -> Dict[str, Any]:
         """Gets movie credits for a person."""
         return await self._request("GET", f"/person/{person_id}/movie_credits")
+
+    async def get_person_tv_credits(self, person_id: int) -> Dict[str, Any]:
+        """Gets TV show credits for a person."""
+        return await self._request("GET", f"/person/{person_id}/tv_credits")
 
     async def get_movie_details(
         self, movie_id: int, append_to_response: str = "external_ids,credits"
