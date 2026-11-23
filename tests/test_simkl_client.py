@@ -240,29 +240,24 @@ async def test_simkl_client_refresh_failure_raises_auth_error():
 
 
 @pytest.mark.asyncio
-async def test_simkl_client_loads_tokens_from_app_settings():
-    from sqlalchemy import delete
+async def test_simkl_client_loads_tokens_from_app_settings(db_session, monkeypatch):
+    from app.core.tokens import save_stored_simkl_tokens
 
-    from app.core.database import SessionLocal
-    from app.core.tokens import SIMKL_TOKENS_SETTING_KEY, save_stored_simkl_tokens
-    from app.models.settings import AppSetting
+    # Route SessionLocal and .env updates to in-memory test database
+    monkeypatch.setattr("app.core.tokens.SessionLocal", lambda: db_session)
+    monkeypatch.setattr("app.core.database.SessionLocal", lambda: db_session)
+    monkeypatch.setattr("app.core.tokens.try_update_env_tokens", lambda *args, **kwargs: None)
 
-    try:
-        # Persist mock tokens in app_settings table
-        save_stored_simkl_tokens(
-            access_token="db_access_token",
-            refresh_token="db_refresh_token",
-            expires_in=3600,
-        )
+    # Persist mock tokens in app_settings table via in-memory session
+    save_stored_simkl_tokens(
+        access_token="db_access_token",
+        refresh_token="db_refresh_token",
+        expires_in=3600,
+        db=db_session,
+    )
 
-        # Initialize client without passing explicit tokens
-        client = SimklClient(client_id="test_client_id")
-        assert client.user_token == "db_access_token"
-        assert client.refresh_token == "db_refresh_token"
-    finally:
-        with SessionLocal() as session:
-            session.execute(
-                delete(AppSetting).where(AppSetting.key == SIMKL_TOKENS_SETTING_KEY)
-            )
-            session.commit()
+    # Initialize client without passing explicit tokens
+    client = SimklClient(client_id="test_client_id")
+    assert client.user_token == "db_access_token"
+    assert client.refresh_token == "db_refresh_token"
 
