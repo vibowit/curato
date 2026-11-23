@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from pydantic import SecretStr
+from pydantic import SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -14,6 +14,19 @@ class Settings(BaseSettings):
 
     # Database
     DATABASE_URL: str = "sqlite:///data/movie_recommend.db"
+    SQLITE_DB_PATH: str | None = None
+
+    @model_validator(mode="after")
+    def assemble_database_url(self) -> "Settings":
+        """Map SQLITE_DB_PATH to DATABASE_URL if explicitly specified."""
+        if self.SQLITE_DB_PATH:
+            # If user specified SQLITE_DB_PATH and DATABASE_URL is default or empty
+            if self.DATABASE_URL == "sqlite:///data/movie_recommend.db" or not self.DATABASE_URL:
+                if self.SQLITE_DB_PATH.startswith("/"):
+                    self.DATABASE_URL = f"sqlite:////{self.SQLITE_DB_PATH.lstrip('/')}"
+                else:
+                    self.DATABASE_URL = f"sqlite:///{self.SQLITE_DB_PATH}"
+        return self
 
     # Simkl Integration
     SIMKL_CLIENT_ID: SecretStr | None = None
@@ -66,8 +79,8 @@ class Settings(BaseSettings):
     def ensure_data_dir(self) -> None:
         """Ensure the local directory for sqlite or data storage exists."""
         if self.is_sqlite:
-            # Strip sqlite:/// or sqlite:////
-            clean_path = self.DATABASE_URL.replace("sqlite:///", "")
+            # Strip sqlite://// or sqlite:///
+            clean_path = self.DATABASE_URL.replace("sqlite:////", "/").replace("sqlite:///", "")
             if clean_path and clean_path != ":memory:":
                 db_file = Path(clean_path)
                 db_file.parent.mkdir(parents=True, exist_ok=True)

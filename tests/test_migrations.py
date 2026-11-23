@@ -42,3 +42,24 @@ def test_alembic_upgrade_and_downgrade():
         tables_after = set(inspector_after.get_table_names())
         assert "media_items" not in tables_after
         assert "recommendations" not in tables_after
+
+
+def test_alembic_uses_settings_database_url(monkeypatch):
+    with tempfile.TemporaryDirectory() as tmpdir:
+        db_path = os.path.join(tmpdir, "dynamic_settings.db")
+        db_url = f"sqlite:///{db_path}"
+
+        from app.core.config import settings
+
+        monkeypatch.setattr(settings, "DATABASE_URL", db_url)
+
+        # Config initialized from alembic.ini without explicit sqlalchemy.url
+        alembic_cfg = Config("alembic.ini")
+
+        command.upgrade(alembic_cfg, "head")
+
+        engine = create_engine(db_url)
+        inspector = inspect(engine)
+        tables = set(inspector.get_table_names())
+        assert "sync_state" in tables
+        assert "media_items" in tables

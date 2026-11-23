@@ -50,3 +50,25 @@ def test_effective_simkl_token():
         _env_file=None,
     )
     assert s3.effective_simkl_token.get_secret_value() == "user_val"
+
+
+def test_sqlite_db_path_mapping():
+    s_abs = Settings(
+        SQLITE_DB_PATH="/app/data/curato_stage.db",
+        _env_file=None,
+    )
+    assert s_abs.DATABASE_URL == "sqlite:////app/data/curato_stage.db"
+
+    s_rel = Settings(
+        SQLITE_DB_PATH="data/curato_stage.db",
+        _env_file=None,
+    )
+    assert s_rel.DATABASE_URL == "sqlite:///data/curato_stage.db"
+
+    # Explicit DATABASE_URL takes priority if changed from default
+    s_custom = Settings(
+        SQLITE_DB_PATH="/app/data/curato_stage.db",
+        DATABASE_URL="sqlite:///custom/path.db",
+        _env_file=None,
+    )
+    assert s_custom.DATABASE_URL == "sqlite:///custom/path.db"

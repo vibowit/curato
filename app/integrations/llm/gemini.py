@@ -20,15 +20,12 @@ class GeminiLLMClient:
 
     BASE_URL: str = "https://generativelanguage.googleapis.com"
     DEFAULT_MODELS: List[str] = [
-        "gemini-2.5-flash",
         "gemini-2.0-flash",
-        "gemini-2.0-flash-exp",
-        "gemini-1.5-flash-latest",
         "gemini-1.5-flash",
-        "gemini-1.5-pro-latest",
+        "gemini-1.5-flash-latest",
+        "gemini-2.0-flash-exp",
         "gemini-1.5-pro",
-        "gemini-pro",
-        "gemini-3-flash-preview",
+        "gemini-1.5-pro-latest",
     ]
 
     _cached_working_model: Optional[str] = None
@@ -45,12 +42,11 @@ class GeminiLLMClient:
         )
         self._api_key = raw_key
         # Check explicit model, then cached working model, then config, then default
-        self._model = (
-            model
-            or self._cached_working_model
-            or settings.GEMINI_MODEL
-            or self.DEFAULT_MODELS[0]
-        )
+        configured_model = model or self._cached_working_model or settings.GEMINI_MODEL
+        if configured_model and "2.5" in configured_model:
+            configured_model = "gemini-2.0-flash"
+
+        self._model = configured_model or self.DEFAULT_MODELS[0]
         self.timeout = timeout
         self._external_client = client
 

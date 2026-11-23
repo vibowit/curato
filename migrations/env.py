@@ -16,10 +16,9 @@ if config.config_file_name is not None:
 
 target_metadata = Base.metadata
 
-# Always set sqlalchemy.url dynamically from application settings if not set via command line
-if not config.get_main_option("sqlalchemy.url") or "driver://" in config.get_main_option(
-    "sqlalchemy.url"
-):
+# Always set sqlalchemy.url dynamically from application settings unless explicitly overridden
+cmd_url = config.get_main_option("sqlalchemy.url")
+if not cmd_url or "driver://" in cmd_url or cmd_url == "sqlite:///data/movie_recommend.db":
     config.set_main_option("sqlalchemy.url", settings.DATABASE_URL)
 
 
