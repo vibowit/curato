@@ -286,7 +286,7 @@ document.addEventListener("DOMContentLoaded", () => {
   // Create Recommendation Card HTML Element
   function createCardElement(rec) {
     const card = document.createElement("div");
-    card.className = "card";
+    card.className = rec.is_wildcard ? "card card-wildcard" : "card";
     card.id = `rec-card-${rec.id}`;
 
     const media = rec.media_item || {};
@@ -334,6 +334,7 @@ document.addEventListener("DOMContentLoaded", () => {
         }
         <div class="card-poster-overlay">
           <span class="badge ${typeBadgeClass}">${typeLabel}</span>
+          ${rec.is_wildcard ? `<span class="badge badge-wildcard">${t("badge_wildcard", "🎲 Zaskocz mnie")}</span>` : ""}
           <span class="badge ${currentStatus.class}" id="status-badge-${rec.id}">${currentStatus.label}</span>
         </div>
       </div>
@@ -779,6 +780,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const movieLimit = Number(document.getElementById("input-movie-limit").value) || 10;
     const showLimit = Number(document.getElementById("input-show-limit").value) || 5;
     const excludeAnim = document.getElementById("input-exclude-animation").checked;
+    const includeWildcards = document.getElementById("input-include-wildcards") ? document.getElementById("input-include-wildcards").checked : true;
     const runLang = document.getElementById("input-run-language")?.value || state.currentLang;
 
     const btnSubmit = document.getElementById("btn-submit-run");
@@ -791,6 +793,7 @@ document.addEventListener("DOMContentLoaded", () => {
         show_limit: showLimit,
         mode: "ondemand",
         exclude_genres: excludeAnim ? ["Animation"] : [],
+        include_wildcards: includeWildcards,
         language: runLang,
       };
       const newRun = await api("/api/recommendation-runs", {

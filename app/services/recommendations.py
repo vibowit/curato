@@ -214,21 +214,65 @@ class RuleBasedRanker:
         )
         return total_score
 
+    @staticmethod
+    def score_wildcard_candidate(candidate: CandidateItem, profile: TasteProfileContent) -> float:
+        # 1. Base TMDB score (vote_average * 8 + popularity)
+        base_score = (candidate.vote_average * 8.0) + min(candidate.popularity * 0.1, 15.0)
+
+        # 2. Vote count reliability bonus (0-10 pts)
+        vote_bonus = min(float(candidate.vote_count) / 100.0, 10.0)
+
+        # 3. Anti-preferences penalty
+        anti_penalty = 0.0
+        overview_lower = (candidate.overview or "").lower()
+        for anti in profile.anti_preferences:
+            anti_keywords = [w for w in anti.lower().split() if len(w) > 3]
+            if any(kw in overview_lower for kw in anti_keywords):
+                anti_penalty += 30.0
+
+        return max(0.0, base_score + vote_bonus - anti_penalty)
+
     def select_top_candidates(
         self,
         candidates: List[CandidateItem],
         profile: TasteProfileContent,
         movie_limit: int = 25,
         show_limit: int = 15,
+        wildcard_movie_limit: int = 5,
+        wildcard_show_limit: int = 4,
     ) -> Tuple[List[CandidateItem], List[CandidateItem]]:
-        """Scores all candidates and returns top movies and top shows for LLM evaluation."""
-        movies = [c for c in candidates if c.media_type == "movie"]
-        shows = [c for c in candidates if c.media_type == "show"]
+        """Scores all candidates and returns top movies and top shows for LLM evaluation,
 
-        scored_movies = sorted(movies, key=lambda m: self.score_candidate(m, profile), reverse=True)
-        scored_shows = sorted(shows, key=lambda s: self.score_candidate(s, profile), reverse=True)
+        ensuring separate, dedicated candidate pools for profile items and wildcard items.
+        """
+        profile_movies = [c for c in candidates if c.media_type == "movie" and not c.is_wildcard]
+        profile_shows = [c for c in candidates if c.media_type == "show" and not c.is_wildcard]
 
-        return scored_movies[:movie_limit], scored_shows[:show_limit]
+        wildcard_movies = [c for c in candidates if c.media_type == "movie" and c.is_wildcard]
+        wildcard_shows = [c for c in candidates if c.media_type == "show" and c.is_wildcard]
+
+        scored_prof_movies = sorted(
+            profile_movies, key=lambda m: self.score_candidate(m, profile), reverse=True
+        )
+        scored_prof_shows = sorted(
+            profile_shows, key=lambda s: self.score_candidate(s, profile), reverse=True
+        )
+
+        scored_wild_movies = sorted(
+            wildcard_movies, key=lambda m: self.score_wildcard_candidate(m, profile), reverse=True
+        )
+        scored_wild_shows = sorted(
+            wildcard_shows, key=lambda s: self.score_wildcard_candidate(s, profile), reverse=True
+        )
+
+        selected_movies = (
+            scored_prof_movies[:movie_limit] + scored_wild_movies[:wildcard_movie_limit]
+        )
+        selected_shows = (
+            scored_prof_shows[:show_limit] + scored_wild_shows[:wildcard_show_limit]
+        )
+
+        return selected_movies, selected_shows
 
 
 class SemanticScorer:
@@ -255,6 +299,7 @@ class SemanticScorer:
                     "director": cand.director_or_creator,
                     "overview": cand.overview,
                     "vote_average": cand.vote_average,
+                    "is_wildcard": cand.is_wildcard,
                 }
             )
 
@@ -307,10 +352,14 @@ Candidates to evaluate ({n} items):
 Guidelines:
 1. "candidate_index": Exact integer index of candidate from the list (0 to {n-1}).
 2. "match_score": Float 0 to 100 representing semantic fit with user profile.
+   For candidates with "is_wildcard": true, match_score represents breakthrough
+   appeal and quality as a horizon-broadening pick (0 to 100).
 3. "confidence": Float 0.0 to 1.0 reflecting confidence from metadata quality.
 4. "positive_factors": {pos_instr}
 5. "risks": {risks_instr}
 6. "reason": {reason_instr}
+   For candidates with "is_wildcard": true, the reason should compellingly explain why
+   it is worth taking a chance on this title despite lying outside typical profile genres.
 """
         return prompt, system_instruction
 
@@ -342,16 +391,40 @@ Guidelines:
             for idx, cand in enumerate(candidates):
                 rule_score = min(95.0, max(60.0, cand.vote_average * 10.0))
                 genres_str = ", ".join(cand.genres[:2]) if cand.genres else "film"
+                if cand.is_wildcard:
+                    if language == "en":
+                        reason = (
+                            f"Surprise Me selection: critically acclaimed title ({genres_str}) "
+                            f"with TMDB rating {cand.vote_average} to broaden your horizons."
+                        )
+                        pos = ["Surprise Me / Wildcard", f"TMDB rating: {cand.vote_average}"]
+                    else:
+                        reason = (
+                            f"Tytuł 'Zaskocz mnie': wysoko oceniany ({genres_str}) "
+                            f"z oceną TMDB {cand.vote_average}, na poszerzenie horyzontów."
+                        )
+                        pos = ["Kategoria 'Zaskocz mnie'", f"Ocena TMDB: {cand.vote_average}"]
+                else:
+                    if language == "en":
+                        reason = (
+                            f"Title matching your taste profile ({genres_str}) "
+                            f"with TMDB rating {cand.vote_average}."
+                        )
+                        pos = [f"Genre alignment: {genres_str}"]
+                    else:
+                        reason = (
+                            f"Tytuł dopasowany do preferencji gatunkowych ({genres_str}) "
+                            f"z oceną TMDB ({cand.vote_average})."
+                        )
+                        pos = [f"Dopasowanie gatunkowe: {genres_str}"]
+
                 fallback_map[idx] = LLMRecommendationEvaluation(
                     candidate_index=idx,
                     match_score=rule_score,
                     confidence=0.7,
-                    positive_factors=[f"Dopasowanie gatunkowe: {genres_str}"],
+                    positive_factors=pos,
                     risks=[],
-                    reason=(
-                        f"Tytuł dopasowany do preferencji gatunkowych ({genres_str}) "
-                        f"z oceną TMDB ({cand.vote_average})."
-                    ),
+                    reason=reason,
                 )
             return fallback_map
 
@@ -364,27 +437,74 @@ class DiversificationService:
         candidates_with_evals: List[Tuple[CandidateItem, LLMRecommendationEvaluation]],
         limit: int,
         max_per_director: int = 2,
+        include_wildcards: bool = True,
     ) -> List[Tuple[CandidateItem, LLMRecommendationEvaluation]]:
-        # Sort by match_score descending
-        sorted_items = sorted(
-            candidates_with_evals, key=lambda item: item[1].match_score, reverse=True
+        if limit <= 0:
+            return []
+
+        profile_items = sorted(
+            [item for item in candidates_with_evals if not item[0].is_wildcard],
+            key=lambda item: item[1].match_score,
+            reverse=True,
         )
+        wildcard_items = sorted(
+            [item for item in candidates_with_evals if item[0].is_wildcard],
+            key=lambda item: item[1].match_score,
+            reverse=True,
+        )
+
+        should_pick_wildcard = include_wildcards and limit >= 2 and len(wildcard_items) > 0
+        target_profile_count = (limit - 1) if should_pick_wildcard else limit
 
         selected: List[Tuple[CandidateItem, LLMRecommendationEvaluation]] = []
         director_counts: Dict[str, int] = {}
 
-        for cand, ev in sorted_items:
+        # 1. Select profile items
+        for cand, ev in profile_items:
             director = cand.director_or_creator
-            if director:
-                if director_counts.get(director, 0) >= max_per_director:
-                    continue
+            if director and director_counts.get(director, 0) >= max_per_director:
+                continue
 
             selected.append((cand, ev))
             if director:
                 director_counts[director] = director_counts.get(director, 0) + 1
 
-            if len(selected) >= limit:
+            if len(selected) >= target_profile_count:
                 break
+
+        # 2. Select wildcard item if requested and available
+        if should_pick_wildcard:
+            chosen_wildcard = None
+            for cand, ev in wildcard_items:
+                director = cand.director_or_creator
+                if director and director_counts.get(director, 0) >= max_per_director:
+                    continue
+                chosen_wildcard = (cand, ev)
+                if director:
+                    director_counts[director] = director_counts.get(director, 0) + 1
+                break
+
+            if chosen_wildcard:
+                selected.append(chosen_wildcard)
+
+        # 3. Backfill if still under limit
+        if len(selected) < limit:
+            selected_ids = {cand.tmdb_id for cand, _ in selected}
+            for pool in [profile_items, wildcard_items]:
+                for cand, ev in pool:
+                    if cand.tmdb_id in selected_ids:
+                        continue
+                    director = cand.director_or_creator
+                    if director and director_counts.get(director, 0) >= max_per_director:
+                        continue
+                    selected.append((cand, ev))
+                    selected_ids.add(cand.tmdb_id)
+                    if director:
+                        director_counts[director] = director_counts.get(director, 0) + 1
+                    if len(selected) >= limit:
+                        break
+                if len(selected) >= limit:
+                    break
 
         return selected
 
@@ -499,19 +619,39 @@ class RecommendationService:
             for idx, cand in enumerate(top_movies):
                 ev = movie_evals_map.get(idx)
                 if not ev:
-                    g_sub = ", ".join(cand.genres[:2])
-                    if target_lang == "en":
-                        pos_factors = [f"Genre alignment: {g_sub}"]
-                        fallback_reason = (
-                            "Recommended title based on taste profile and "
-                            f"TMDB rating ({cand.vote_average})."
-                        )
+                    g_sub = ", ".join(cand.genres[:2]) if cand.genres else "film"
+                    if cand.is_wildcard:
+                        if target_lang == "en":
+                            pos_factors = [
+                                "Surprise Me / Wildcard",
+                                f"TMDB rating: {cand.vote_average}",
+                            ]
+                            fallback_reason = (
+                                f"Surprise Me selection: highly acclaimed title ({g_sub}) "
+                                f"with TMDB rating {cand.vote_average} to broaden your horizons."
+                            )
+                        else:
+                            pos_factors = [
+                                "Kategoria 'Zaskocz mnie'",
+                                f"Ocena TMDB: {cand.vote_average}",
+                            ]
+                            fallback_reason = (
+                                f"Film z kategorii 'Zaskocz mnie': tytuł ({g_sub}) z oceną "
+                                f"TMDB {cand.vote_average}, wybrany na poszerzenie horyzontów."
+                            )
                     else:
-                        pos_factors = [f"Dopasowanie gatunkowe: {g_sub}"]
-                        fallback_reason = (
-                            "Film polecany na podstawie profilu gustu oraz "
-                            f"oceny TMDB ({cand.vote_average})."
-                        )
+                        if target_lang == "en":
+                            pos_factors = [f"Genre alignment: {g_sub}"]
+                            fallback_reason = (
+                                "Recommended title based on taste profile and "
+                                f"TMDB rating ({cand.vote_average})."
+                            )
+                        else:
+                            pos_factors = [f"Dopasowanie gatunkowe: {g_sub}"]
+                            fallback_reason = (
+                                "Film polecany na podstawie profilu gustu oraz "
+                                f"oceny TMDB ({cand.vote_average})."
+                            )
                     ev = LLMRecommendationEvaluation(
                         candidate_index=idx,
                         match_score=min(95.0, max(60.0, cand.vote_average * 10.0)),
@@ -526,19 +666,39 @@ class RecommendationService:
             for idx, cand in enumerate(top_shows):
                 ev = show_evals_map.get(idx)
                 if not ev:
-                    g_sub = ", ".join(cand.genres[:2])
-                    if target_lang == "en":
-                        pos_factors = [f"Genre alignment: {g_sub}"]
-                        fallback_reason = (
-                            "Recommended TV show based on taste profile and "
-                            f"TMDB rating ({cand.vote_average})."
-                        )
+                    g_sub = ", ".join(cand.genres[:2]) if cand.genres else "serial"
+                    if cand.is_wildcard:
+                        if target_lang == "en":
+                            pos_factors = [
+                                "Surprise Me / Wildcard",
+                                f"TMDB rating: {cand.vote_average}",
+                            ]
+                            fallback_reason = (
+                                f"Surprise Me selection: highly acclaimed TV show ({g_sub}) "
+                                f"with TMDB rating {cand.vote_average} to broaden your horizons."
+                            )
+                        else:
+                            pos_factors = [
+                                "Kategoria 'Zaskocz mnie'",
+                                f"Ocena TMDB: {cand.vote_average}",
+                            ]
+                            fallback_reason = (
+                                f"Serial z kategorii 'Zaskocz mnie': tytuł ({g_sub}) z oceną "
+                                f"TMDB {cand.vote_average}, wybrany na poszerzenie horyzontów."
+                            )
                     else:
-                        pos_factors = [f"Dopasowanie gatunkowe: {g_sub}"]
-                        fallback_reason = (
-                            "Serial polecany na podstawie profilu gustu oraz "
-                            f"oceny TMDB ({cand.vote_average})."
-                        )
+                        if target_lang == "en":
+                            pos_factors = [f"Genre alignment: {g_sub}"]
+                            fallback_reason = (
+                                "Recommended TV show based on taste profile and "
+                                f"TMDB rating ({cand.vote_average})."
+                            )
+                        else:
+                            pos_factors = [f"Dopasowanie gatunkowe: {g_sub}"]
+                            fallback_reason = (
+                                "Serial polecany na podstawie profilu gustu oraz "
+                                f"oceny TMDB ({cand.vote_average})."
+                            )
                     ev = LLMRecommendationEvaluation(
                         candidate_index=idx,
                         match_score=min(95.0, max(60.0, cand.vote_average * 10.0)),
@@ -551,10 +711,16 @@ class RecommendationService:
 
             # 7. Diversification & final selection (10 movies, 5 shows)
             final_movies = DiversificationService.diversify(
-                evaluated_movies, limit=req.movie_limit, max_per_director=2
+                evaluated_movies,
+                limit=req.movie_limit,
+                max_per_director=2,
+                include_wildcards=req.include_wildcards,
             )
             final_shows = DiversificationService.diversify(
-                evaluated_shows, limit=req.show_limit, max_per_director=2
+                evaluated_shows,
+                limit=req.show_limit,
+                max_per_director=2,
+                include_wildcards=req.include_wildcards,
             )
             final_selection = final_movies + final_shows
 
@@ -638,6 +804,7 @@ class RecommendationService:
                     positive_factors_json=json.dumps(ev.positive_factors, ensure_ascii=False),
                     risks_json=json.dumps(ev.risks, ensure_ascii=False),
                     status="pending",
+                    is_wildcard=cand.is_wildcard,
                 )
                 db.add(recommendation)
 
@@ -764,6 +931,7 @@ class RecommendationService:
                     positive_factors=pos_factors,
                     risks=risks,
                     status=rec.status,
+                    is_wildcard=getattr(rec, "is_wildcard", False),
                     latest_decision=latest_decision,
                     created_at=rec.created_at,
                     trailer_key=trailer_key,

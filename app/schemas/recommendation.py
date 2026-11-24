@@ -25,6 +25,9 @@ class CandidateItem(BaseModel):
     source_strategy: str = Field(
         ..., description="e.g. 'similar_to_favorites', 'profile_genres', 'director', 'exploration'"
     )
+    is_wildcard: bool = Field(
+        default=False, description="Flag indicating wildcard / surprise me candidate"
+    )
 
 
 class LLMRecommendationEvaluation(BaseModel):
@@ -69,6 +72,10 @@ class RecommendationRunCreateRequest(BaseModel):
     language: Optional[str] = Field(
         default=None, description="Language code for recommendations (e.g. 'pl', 'en')"
     )
+    include_wildcards: bool = Field(
+        default=True,
+        description="Whether to include 1 wildcard movie and 1 wildcard show in recommendations",
+    )
 
 
 class MediaItemSummary(BaseModel):
@@ -102,6 +109,7 @@ class RecommendationRead(BaseModel):
     positive_factors: List[str] = Field(default_factory=list)
     risks: List[str] = Field(default_factory=list)
     status: str
+    is_wildcard: bool = False
     latest_decision: Optional[str] = None
     created_at: datetime
     trailer_key: Optional[str] = None

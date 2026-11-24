@@ -523,3 +523,186 @@ async def test_create_recommendation_run_with_english_language(test_db: Session)
     assert run.status == "completed"
     assert "Successfully generated" in run.summary
     assert "v1.0-mock" in run.summary
+
+
+def test_rule_based_ranker_wildcard_pool_separation(sample_profile_content: TasteProfileContent):
+    ranker = RuleBasedRanker()
+
+    # 3 profile movies
+    profile_movies = [
+        CandidateItem(
+            tmdb_id=i,
+            media_type="movie",
+            title=f"Profile Movie {i}",
+            vote_average=7.5,
+            popularity=20.0,
+            genres=["Crime", "Drama"],
+            source_strategy="profile_genres",
+            is_wildcard=False,
+        )
+        for i in range(1, 4)
+    ]
+    # 2 wildcard movies
+    wildcard_movies = [
+        CandidateItem(
+            tmdb_id=100 + i,
+            media_type="movie",
+            title=f"Wildcard Movie {i}",
+            vote_average=8.2,
+            popularity=15.0,
+            genres=["Western"],
+            source_strategy="exploration",
+            is_wildcard=True,
+        )
+        for i in range(1, 3)
+    ]
+
+    selected_movies, selected_shows = ranker.select_top_candidates(
+        candidates=profile_movies + wildcard_movies,
+        profile=sample_profile_content,
+        movie_limit=2,
+        wildcard_movie_limit=1,
+    )
+    # 2 profile + 1 wildcard = 3 movies
+    assert len(selected_movies) == 3
+    wildcards = [m for m in selected_movies if m.is_wildcard]
+    profiles = [m for m in selected_movies if not m.is_wildcard]
+    assert len(wildcards) == 1
+    assert len(profiles) == 2
+
+
+def test_diversification_guarantees_wildcard_slot():
+    from app.schemas.recommendation import LLMRecommendationEvaluation
+
+    items = []
+    # 10 profile movies
+    for i in range(10):
+        cand = CandidateItem(
+            tmdb_id=i,
+            media_type="movie",
+            title=f"Movie {i}",
+            vote_average=7.5,
+            source_strategy="profile_genres",
+            is_wildcard=False,
+        )
+        ev = LLMRecommendationEvaluation(
+            candidate_index=i,
+            match_score=95.0 - i,
+            confidence=0.9,
+            reason="Good fit",
+        )
+        items.append((cand, ev))
+
+    # 2 wildcard movies
+    for i in range(2):
+        cand = CandidateItem(
+            tmdb_id=100 + i,
+            media_type="movie",
+            title=f"Wildcard {i}",
+            vote_average=8.5,
+            source_strategy="exploration",
+            is_wildcard=True,
+        )
+        ev = LLMRecommendationEvaluation(
+            candidate_index=10 + i,
+            match_score=80.0 - i,  # lower score than profile items
+            confidence=0.85,
+            reason="Horizon broadener",
+        )
+        items.append((cand, ev))
+
+    # Diversify for 10 movies with include_wildcards=True
+    diversified = DiversificationService.diversify(
+        items, limit=10, max_per_director=2, include_wildcards=True
+    )
+    assert len(diversified) == 10
+    wildcards = [c for c, _ in diversified if c.is_wildcard]
+    profiles = [c for c, _ in diversified if not c.is_wildcard]
+    assert len(wildcards) == 1
+    assert len(profiles) == 9
+    assert wildcards[0].title == "Wildcard 0"
+
+
+@pytest.mark.asyncio
+async def test_create_recommendation_run_persists_is_wildcard(test_db: Session):
+    taste_profile = TasteProfile(
+        version="v2.0-wildcard-test",
+        profile_json=json.dumps(
+            {
+                "summary": "Lover of crime and thrillers.",
+                "genres": [{"name": "Crime", "weight": 0.9, "confidence": 0.9}],
+                "themes": [],
+                "directors_or_creators": [],
+                "anti_preferences": [],
+                "temporary_interests": [],
+            }
+        ),
+        active=True,
+    )
+    test_db.add(taste_profile)
+    test_db.commit()
+
+    class MockDiscoveryWithWildcard(DiscoveryService):
+        def __init__(self):
+            pass
+
+        async def discover_candidates(self, *args, **kwargs):
+            return [
+                CandidateItem(
+                    tmdb_id=10,
+                    media_type="movie",
+                    title="Profile Movie 1",
+                    genres=["Crime"],
+                    vote_average=8.0,
+                    source_strategy="profile_genres",
+                    is_wildcard=False,
+                ),
+                CandidateItem(
+                    tmdb_id=20,
+                    media_type="movie",
+                    title="Wildcard Movie",
+                    genres=["Comedy"],
+                    vote_average=8.5,
+                    source_strategy="exploration",
+                    is_wildcard=True,
+                ),
+                CandidateItem(
+                    tmdb_id=30,
+                    media_type="show",
+                    title="Profile Show 1",
+                    genres=["Crime"],
+                    vote_average=8.2,
+                    source_strategy="profile_genres",
+                    is_wildcard=False,
+                ),
+                CandidateItem(
+                    tmdb_id=40,
+                    media_type="show",
+                    title="Wildcard Show",
+                    genres=["Documentary"],
+                    vote_average=8.6,
+                    source_strategy="exploration",
+                    is_wildcard=True,
+                ),
+            ]
+
+    service = RecommendationService(
+        discovery_service=MockDiscoveryWithWildcard(),
+        llm_provider=MockLLM(),
+    )
+
+    req = RecommendationRunCreateRequest(movie_limit=2, show_limit=2, include_wildcards=True)
+    run = await service.create_recommendation_run(test_db, req)
+    assert run.status == "completed"
+
+    schema = service.to_read_schema(run)
+    assert len(schema.recommendations) == 4
+
+    movies = [r for r in schema.recommendations if r.media_item.media_type == "movie"]
+    shows = [r for r in schema.recommendations if r.media_item.media_type == "show"]
+
+    assert len([m for m in movies if m.is_wildcard]) == 1
+    assert len([m for m in movies if not m.is_wildcard]) == 1
+    assert len([s for s in shows if s.is_wildcard]) == 1
+    assert len([s for s in shows if not s.is_wildcard]) == 1
+

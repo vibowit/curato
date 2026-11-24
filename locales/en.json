@@ -27,6 +27,7 @@
     "filter_status_added": "In Simkl",
     "filter_status_rejected": "Rejected",
     "filter_status_seen": "Already Seen",
+    "badge_wildcard": "🎲 Surprise Me",
     "btn_trailer": "Trailer",
     "btn_accept": "Accept",
     "btn_reject": "Reject",
@@ -40,6 +41,7 @@
     "field_movie_limit": "Movie count (default 10):",
     "field_show_limit": "TV show count (default 5):",
     "field_exclude_animation": "Exclude animation (per taste preferences)",
+    "field_include_wildcards": "Include 'Surprise Me' picks (1 movie and 1 show to broaden taste)",
     "btn_cancel": "Cancel",
     "btn_start_generation": "Start generation",
     "modal_profile_title": "🧠 User Taste Profile",
@@ -79,8 +81,8 @@
     },
     "recommendations": {
       "system_instruction": "You are a sophisticated cinematic taste analyzer and personal recommender. Output strictly valid JSON conforming to the requested schema. Do not invent metadata.",
-      "reason_instruction": "1-2 sentence compelling English narrative explaining why this title fits.",
-      "positive_factors_instruction": "1 to 3 concise English strings describing why this matches user taste.",
+      "reason_instruction": "1-2 sentence compelling English narrative explaining why this title fits. For candidates with is_wildcard=true, explain compellingly why it is worth taking a chance on this title despite lying outside usual genres.",
+      "positive_factors_instruction": "1 to 3 concise English strings describing why this matches user taste (or why it is a compelling exploration pick for is_wildcard=true).",
       "risks_instruction": "0 to 2 potential concerns or mismatch risks in English (or empty list if none)."
     }
   }

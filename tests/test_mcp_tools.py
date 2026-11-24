@@ -212,6 +212,7 @@ async def test_get_recommendations(setup_mcp_db):
             confidence=0.9,
             reason="Masterpiece of sci-fi worldbuilding.",
             status="pending",
+            is_wildcard=True,
         )
         db.add(rec)
         db.commit()
@@ -223,6 +224,7 @@ async def test_get_recommendations(setup_mcp_db):
     assert len(data["recommendations"]) == 1
     assert data["recommendations"][0]["title"] == "Dune"
     assert data["recommendations"][0]["match_score"] == 94.0
+    assert data["recommendations"][0]["is_wildcard"] is True
 
 
 @pytest.mark.asyncio

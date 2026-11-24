@@ -115,6 +115,7 @@ def test_create_and_get_recommendation_run(app_client: TestClient, db_session: S
         rec1 = data["recommendations"][0]
         assert rec1["status"] == "pending"
         assert rec1["match_score"] > 90.0
+        assert "is_wildcard" in rec1
         assert rec1["media_item"]["title"] in ["Prisoners", "Mindhunter"]
 
         # Test GET /api/recommendation-runs/{run_id}

@@ -27,6 +27,7 @@
     "filter_status_added": "W Simkl",
     "filter_status_rejected": "Odrzucone",
     "filter_status_seen": "Obejrzane",
+    "badge_wildcard": "🎲 Zaskocz mnie",
     "btn_trailer": "Zwiastun",
     "btn_accept": "Zaakceptuj",
     "btn_reject": "Odrzuć",
@@ -40,6 +41,7 @@
     "field_movie_limit": "Liczba filmów (domyślnie 10):",
     "field_show_limit": "Liczba seriali (domyślnie 5):",
     "field_exclude_animation": "Wyklucz animacje (zgodnie z preferencjami gustu)",
+    "field_include_wildcards": "Dołącz pozycje 'Zaskocz mnie' (1 film i 1 serial na poszerzenie gustu)",
     "btn_cancel": "Anuluj",
     "btn_start_generation": "Uruchom generowanie",
     "modal_profile_title": "🧠 Profil Gustu Użytkownika",
@@ -79,8 +81,8 @@
     },
     "recommendations": {
       "system_instruction": "You are a sophisticated cinematic taste analyzer and personal recommender. Output strictly valid JSON conforming to the requested schema. Do not invent metadata.",
-      "reason_instruction": "1-2 sentence compelling Polish narrative explaining why this title fits.",
-      "positive_factors_instruction": "1 to 3 concise Polish strings describing why this matches user taste.",
+      "reason_instruction": "1-2 sentence compelling Polish narrative explaining why this title fits. For candidates with is_wildcard=true, explain compellingly why it is worth taking a chance on this title despite lying outside usual genres.",
+      "positive_factors_instruction": "1 to 3 concise Polish strings describing why this matches user taste (or why it is a compelling exploration pick for is_wildcard=true).",
       "risks_instruction": "0 to 2 potential concerns or mismatch risks in Polish (or empty list if none)."
     }
   }

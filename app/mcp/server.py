@@ -185,10 +185,11 @@ async def generate_recommendations(
     movie_limit: int = 10,
     show_limit: int = 5,
     language: Optional[str] = None,
+    include_wildcards: bool = True,
 ) -> Dict[str, Any]:
     """Generates a new recommendation edition (movies & shows) based on active profile.
 
-    Supports optional language parameter (e.g. 'pl', 'en').
+    Supports optional language parameter (e.g. 'pl', 'en') and include_wildcards flag.
     """
     try:
         with SessionLocal() as db:
@@ -198,6 +199,7 @@ async def generate_recommendations(
                 show_limit=show_limit,
                 mode="on_demand",
                 language=language,
+                include_wildcards=include_wildcards,
             )
             run = await service.create_recommendation_run(db=db, request=req)
             schema = service.to_read_schema(run)
@@ -248,6 +250,7 @@ async def get_recommendations(run_id: Optional[int] = None) -> Dict[str, Any]:
                         "positive_factors": r.positive_factors,
                         "risks": r.risks,
                         "status": r.status,
+                        "is_wildcard": r.is_wildcard,
                         "latest_decision": r.latest_decision,
                         "trailer_url": r.trailer_url
                         or (r.media_item.trailer_url if r.media_item else None),

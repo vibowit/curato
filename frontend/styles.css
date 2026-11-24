@@ -241,6 +241,23 @@ body {
   border: 1px solid rgba(245, 158, 11, 0.4);
 }
 
+.badge-wildcard {
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.4), rgba(99, 102, 241, 0.4));
+  color: #ddd6fe;
+  border: 1px solid rgba(167, 139, 250, 0.7);
+  box-shadow: 0 0 8px rgba(139, 92, 246, 0.3);
+  font-weight: 600;
+}
+
+.card-wildcard {
+  border-color: rgba(139, 92, 246, 0.4);
+}
+
+.card-wildcard:hover {
+  border-color: rgba(167, 139, 250, 0.8);
+  box-shadow: 0 8px 24px rgba(139, 92, 246, 0.2);
+}
+
 .badge-status-pending { background-color: #475569; color: #cbd5e1; }
 .badge-status-accepted { background-color: rgba(16, 185, 129, 0.25); color: #6ee7b7; border: 1px solid rgba(16, 185, 129, 0.5); }
 .badge-status-added { background-color: rgba(59, 130, 246, 0.25); color: #93c5fd; border: 1px solid rgba(59, 130, 246, 0.5); }

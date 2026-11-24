@@ -45,7 +45,11 @@ class DiscoveryService:
         return [TMDB_GENRE_NAMES[gid] for gid in genre_ids if gid in TMDB_GENRE_NAMES]
 
     def _normalize_movie(
-        self, raw: Dict[str, Any], strategy: str, director: Optional[str] = None
+        self,
+        raw: Dict[str, Any],
+        strategy: str,
+        director: Optional[str] = None,
+        is_wildcard: bool = False,
     ) -> Optional[CandidateItem]:
         tmdb_id = raw.get("id")
         title = raw.get("title")
@@ -70,10 +74,15 @@ class DiscoveryService:
             popularity=float(raw.get("popularity", 0.0)),
             poster_path=raw.get("poster_path"),
             source_strategy=strategy,
+            is_wildcard=is_wildcard or (strategy == "exploration"),
         )
 
     def _normalize_show(
-        self, raw: Dict[str, Any], strategy: str, creator: Optional[str] = None
+        self,
+        raw: Dict[str, Any],
+        strategy: str,
+        creator: Optional[str] = None,
+        is_wildcard: bool = False,
     ) -> Optional[CandidateItem]:
         tmdb_id = raw.get("id")
         title = raw.get("name")
@@ -98,6 +107,7 @@ class DiscoveryService:
             popularity=float(raw.get("popularity", 0.0)),
             poster_path=raw.get("poster_path"),
             source_strategy=strategy,
+            is_wildcard=is_wildcard or (strategy == "exploration"),
         )
 
     async def get_favorites_from_db(
@@ -348,12 +358,12 @@ class DiscoveryService:
                     exp_m = await self.tmdb.discover_movies(
                         without_genres=movie_without_ids or None,
                         sort_by="vote_average.desc",
-                        vote_count_gte=300,
+                        vote_count_gte=250,
                         vote_average_gte=7.8,
                     )
                     return [
-                        self._normalize_movie(item, strategy="exploration")
-                        for item in exp_m.get("results", [])[:8]
+                        self._normalize_movie(item, strategy="exploration", is_wildcard=True)
+                        for item in exp_m.get("results", [])[:10]
                     ]
                 except TMDBAuthError:
                     raise
@@ -371,8 +381,8 @@ class DiscoveryService:
                         vote_average_gte=8.0,
                     )
                     return [
-                        self._normalize_show(item, strategy="exploration")
-                        for item in exp_s.get("results", [])[:6]
+                        self._normalize_show(item, strategy="exploration", is_wildcard=True)
+                        for item in exp_s.get("results", [])[:8]
                     ]
                 except TMDBAuthError:
                     raise

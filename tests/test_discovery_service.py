@@ -200,3 +200,62 @@ async def test_discover_candidates_compound_genres(test_db: Session):
     assert len(genre_candidates) >= 2
     assert any(c.media_type == "show" for c in genre_candidates)
     assert any(c.media_type == "movie" for c in genre_candidates)
+
+
+@pytest.mark.asyncio
+async def test_discover_candidates_exploration_sets_wildcard(test_db: Session):
+    def handler(request: httpx.Request) -> httpx.Response:
+        path = request.url.path
+        if "/discover/movie" in path:
+            return httpx.Response(
+                200,
+                json={
+                    "results": [
+                        {
+                            "id": 999,
+                            "title": "Exploration Masterpiece",
+                            "genre_ids": [18],
+                            "release_date": "2023-01-01",
+                            "vote_average": 8.5,
+                            "vote_count": 500,
+                        }
+                    ]
+                },
+            )
+        elif "/discover/tv" in path:
+            return httpx.Response(
+                200,
+                json={
+                    "results": [
+                        {
+                            "id": 888,
+                            "name": "Exploration Show",
+                            "genre_ids": [18],
+                            "first_air_date": "2023-01-01",
+                            "vote_average": 8.7,
+                            "vote_count": 300,
+                        }
+                    ]
+                },
+            )
+        return httpx.Response(200, json={"results": []})
+
+    transport = httpx.MockTransport(handler)
+    client = TMDBClient(api_key="test_key", transport=transport)
+    service = DiscoveryService(tmdb_client=client)
+
+    profile = TasteProfileContent(
+        summary="Test",
+        genres=[],
+        themes=[],
+        directors_or_creators=[],
+        anti_preferences=[],
+        temporary_interests=[],
+        metadata={},
+    )
+
+    candidates = await service.discover_candidates(test_db, profile=profile)
+    exploration = [c for c in candidates if c.source_strategy == "exploration"]
+    assert len(exploration) >= 2
+    assert all(c.is_wildcard is True for c in exploration)
+

@@ -57,8 +57,7 @@ danych.
 
 ## Dywersyfikacja i limity
 
-Domyślnie: 10 filmów i 5 seriali na tydzień. Unikaj wielu niemal
-identycznych propozycji. Nie filtruj według dostępności streamingowej.
+Domyślnie: 10 filmów i 5 seriali na tydzień. W ramach każdej puli rezerwowany jest 1 dedykowany slot na pozycję "Zaskocz mnie" (Wildcard z puli Strategy D - Eksploracja), co zapobiega wpadaniu w bańkę filtrującą i pozwala na stopniową ewolucję profilu gustu użytkownika. Opcja ta jest konfigurowalna (`include_wildcards=True`). Unikaj wielu niemal identycznych propozycji. Nie filtruj według dostępności streamingowej.
 
 ## Zasady bezpieczeństwa
 

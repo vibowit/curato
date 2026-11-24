@@ -80,6 +80,12 @@ def test_recommendation_run_and_uniqueness(db_session):
     )
     db_session.add(rec1)
     db_session.commit()
+    assert rec1.is_wildcard is False
+
+    rec1.is_wildcard = True
+    db_session.commit()
+    db_session.refresh(rec1)
+    assert rec1.is_wildcard is True
 
     # Verify duplicate recommendation in same run raises IntegrityError
     rec_dup = Recommendation(
