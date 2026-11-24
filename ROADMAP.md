@@ -118,15 +118,41 @@ historii. (Ukończono pomyślnie)
 
 **Akceptacja:** Użytkownik może dynamicznie przełączać język interfejsu (PL/EN), generować rekomendacje w wybranym języku oraz zdefiniować własny język poprzez dodanie pojedynczego pliku JSON. (Ukończono pomyślnie)
 
-## Etap 10 -- Poprawa jakości i puli rekomendacji seriali (W trakcie)
+## Etap 10 -- Poprawa jakości i puli rekomendacji seriali
 
 Szczegółowy plan techniczny: patrz [docs/plans/plan-seriale-jakosc-rekomendacji.md](docs/plans/plan-seriale-jakosc-rekomendacji.md).
 
--   [ ] Faza 1: Rozszerzenie klienta TMDB (`get_person_tv_credits`) oraz elastyczny resolver złożonych nazw gatunków (`resolve_tmdb_genre_ids`).
--   [ ] Faza 2: Zrównoważenie puli ulubionych w bazie (osobne limity dla filmów i seriali) oraz wyszukiwanie seriali twórców (`fetch_creator_shows`) w `DiscoveryService`.
--   [ ] Faza 3: Testy jednostkowe z `httpx.MockTransport`, weryfikacja end-to-end, linting `ruff` i ocena jakości proponowanych seriali.
+-   [x] Faza 1: Rozszerzenie klienta TMDB (`get_person_tv_credits`) oraz elastyczny resolver złożonych nazw gatunków (`resolve_tmdb_genre_ids`).
+-   [x] Faza 2: Zrównoważenie puli ulubionych w bazie (osobne limity dla filmów i seriali) oraz wyszukiwanie seriali twórców (`fetch_creator_shows`) w `DiscoveryService`.
+-   [x] Faza 3: Testy jednostkowe z `httpx.MockTransport`, weryfikacja end-to-end, linting `ruff` i ocena jakości proponowanych seriali.
 
-**Akceptacja:** Wygenerowana pula kandydatów serialowych zawiera tytuły odzwierciedlające preferencje użytkownika (kryminał, dramat, twórcy z profilu), eliminując problem sztucznie zaniżonych ocen semantycznych.
+**Akceptacja:** Wygenerowana pula kandydatów serialowych zawiera tytuły odzwierciedlające preferencje użytkownika (kryminał, dramat, twórcy z profilu), eliminując problem sztucznie zaniżonych ocen semantycznych. (Ukończono pomyślnie)
+
+## Etap 11 -- Rekomendacje poszerzające horyzonty: sloty "Zaskocz mnie" (Wildcards)
+
+-   [x] Rozszerzenie modelu bazy danych i migracji Alembic o kolumnę `is_wildcard` w tabeli `recommendations`.
+-   [x] Generowanie kandydatów eksploracyjnych w Strategii D (`DiscoveryService`) spoza dominujących gatunków użytkownika.
+-   [x] Separacja puli regularnej i eksploracyjnej w `RuleBasedRanker` oraz dywersyfikacji (gwarantowane 9+1 filmów oraz 4+1 seriali).
+-   [x] Dedykowane instrukcje dla LLM (analiza przełomowości, atrakcyjności i przekonujące uzasadnienia w języku polskim).
+-   [x] Prezentacja w UI: wyróżniający badge `🎲 Zaskocz mnie` na karcie pozycji oraz opcja włączenia/wyłączenia w modalu generowania.
+-   [x] Aktualizacja serwera MCP (`is_wildcard` w wynikach, parametr `include_wildcards`).
+
+**Akceptacja:** Każda edycja rekomendacji zawiera dokładnie 1 film i 1 serial wysokiej jakości spoza typowych gatunków profilu, zapobiegając wpadaniu w bańkę rekomendacyjną. (Ukończono pomyślnie)
+
+## Etap 12 -- Niezawodność silnika, odporność LLM i usprawnienia UX (Backlog do realizacji)
+
+-   [ ] **12.1. Jawny wskaźnik trybu awaryjnego (Fallback badge w UI)**:
+    - Dodanie flagi `is_fallback` do `RecommendationRunRead` i bazy danych.
+    - Wizualna informacja w interfejsie (`⚡ Tryb awaryjny – rekomendacje wygenerowane na podstawie rankera lokalnego`), gdy serwery Gemini były niedostępne.
+-   [ ] **12.2. Podział oceny kandydatów na mniejsze paczki (Batching LLM)**:
+    - Ewaluacja kandydatów w mniejszych partiach (np. po 10-12 pozycji zamiast 25 naraz).
+    - Zmniejszenie obciążenia pojedynczych requestów i eliminacja ryzyka zrzucenia połączenia (503) przez upstream Google.
+-   [ ] **12.3. Automatyczny test spójności bazy danych (`alembic check` w pytest)**:
+    - Test weryfikujący zgodność modeli SQLAlchemy z bieżącymi migracjami Alembic.
+    - Fail-fast w CI w razie braku wygenerowania lub zastosowania migracji.
+-   [ ] **12.4. Asynchroniczne generowanie edycji ze statusem postępu (Background Jobs)**:
+    - Refaktoryzacja `POST /api/recommendation-runs` na zadanie w tle (odpowiedź `202 Accepted`).
+    - Pasek postępu i polling statusu w UI (np. *„1/3 Pobieranie kandydatów... 2/3 Analiza AI... 3/3 Zróżnicowanie listy...”*).
 
 ## Przyszłe rozszerzenia (Future Backlog)
 
