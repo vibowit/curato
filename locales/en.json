@@ -71,6 +71,8 @@
     "history_col_edition": "Edition",
     "history_col_date": "Date",
     "history_empty": "No recorded decisions in history.",
+    "badge_low_metadata": "Limited data",
+    "tooltip_low_metadata": "Limited metadata in database for this title",
     "error_timeout": "Request timed out. Please try again in a moment."
   },
   "prompts": {

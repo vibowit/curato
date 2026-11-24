@@ -421,7 +421,7 @@ Guidelines:
                 fallback_map[idx] = LLMRecommendationEvaluation(
                     candidate_index=idx,
                     match_score=rule_score,
-                    confidence=0.7,
+                    confidence=0.85,
                     positive_factors=pos,
                     risks=[],
                     reason=reason,
@@ -655,7 +655,7 @@ class RecommendationService:
                     ev = LLMRecommendationEvaluation(
                         candidate_index=idx,
                         match_score=min(95.0, max(60.0, cand.vote_average * 10.0)),
-                        confidence=0.7,
+                        confidence=0.85,
                         positive_factors=pos_factors,
                         risks=[],
                         reason=fallback_reason,
@@ -702,7 +702,7 @@ class RecommendationService:
                     ev = LLMRecommendationEvaluation(
                         candidate_index=idx,
                         match_score=min(95.0, max(60.0, cand.vote_average * 10.0)),
-                        confidence=0.7,
+                        confidence=0.85,
                         positive_factors=pos_factors,
                         risks=[],
                         reason=fallback_reason,

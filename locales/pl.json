@@ -71,6 +71,8 @@
     "history_col_edition": "Edycja",
     "history_col_date": "Data",
     "history_empty": "Brak zapisanych decyzji w historii.",
+    "badge_low_metadata": "Mało danych",
+    "tooltip_low_metadata": "Ograniczone metadane w bazie dla tego tytułu",
     "error_timeout": "Przekroczono limit czasu żądania (timeout). Spróbuj ponownie za chwilę."
   },
   "prompts": {

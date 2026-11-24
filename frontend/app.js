@@ -314,7 +314,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const matchPercent = Math.round(rec.match_score);
     const tmdbRating = media.vote_average ? Number(media.vote_average).toFixed(1) : null;
-    const isLowConfidence = rec.confidence < 0.75;
+    const isLowConfidence = rec.confidence < 0.5;
 
     // Status mapping with localized labels
     const statusMap = {
@@ -330,12 +330,7 @@ document.addEventListener("DOMContentLoaded", () => {
       .map((f) => `<span class="factor-tag factor-positive">✓ ${f}</span>`)
       .join("");
 
-    const allRisks = [...(rec.risks || [])];
-    if (isLowConfidence) {
-      allRisks.unshift(t("risks_label", "Ograniczone metadane w bazie dla tego tytułu"));
-    }
-
-    const risksHtml = allRisks
+    const risksHtml = (rec.risks || [])
       .map((r) => `<span class="factor-tag factor-risk">⚠ ${r}</span>`)
       .join("");
 
@@ -359,6 +354,7 @@ document.addEventListener("DOMContentLoaded", () => {
         <div class="card-match-bar">
           <span class="match-score-badge" title="Score: ${matchPercent}%">${matchPercent}%</span>
           ${tmdbRating ? `<span class="rating-badge" title="TMDB Community Rating">★ ${tmdbRating}</span>` : ""}
+          ${isLowConfidence ? `<span class="warning-badge" title="${t("tooltip_low_metadata", "Ograniczone metadane w bazie dla tego tytułu")}">⚠️ ${t("badge_low_metadata", "Mało danych")}</span>` : ""}
           <button class="btn-card-trailer" data-action="trailer" data-id="${rec.id}" title="${t("btn_trailer", "Zwiastun")}">
             🎬 ${t("btn_trailer", "Zwiastun")}
           </button>

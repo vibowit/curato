@@ -21,8 +21,10 @@ class GeminiLLMClient:
 
     BASE_URL: str = "https://generativelanguage.googleapis.com"
     DEFAULT_MODELS: List[str] = [
+        "gemini-3.1-flash-lite",
         "gemini-3.5-flash-lite",
         "gemini-flash-lite-latest",
+        "gemini-3-flash-preview",
     ]
 
     _cached_working_model: Optional[str] = None
@@ -31,7 +33,7 @@ class GeminiLLMClient:
         self,
         api_key: Optional[str] = None,
         model: Optional[str] = None,
-        timeout: float = 15.0,
+        timeout: float = 25.0,
         client: Optional[httpx.AsyncClient] = None,
     ):
         raw_key = api_key or (
@@ -45,7 +47,7 @@ class GeminiLLMClient:
             any(v in configured_model for v in ("1.5", "2.0", "2.5"))
             or configured_model in ("gemini-3.5-flash", "gemini-flash-latest", "gemini-3.8-flash")
         ):
-            configured_model = "gemini-3.5-flash-lite"
+            configured_model = "gemini-3.1-flash-lite"
 
         self._model = configured_model or self.DEFAULT_MODELS[0]
         self.timeout = timeout
