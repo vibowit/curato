@@ -53,6 +53,8 @@ async def test_gemini_client_success():
 async def test_gemini_client_normalizes_obsolete_model():
     gemini = GeminiLLMClient(api_key="fake_key", model="gemini-2.5-flash")
     assert gemini.model_name == "gemini-3.5-flash-lite"
+    gemini2 = GeminiLLMClient(api_key="fake_key", model="gemini-3.5-flash")
+    assert gemini2.model_name == "gemini-3.5-flash-lite"
 
 
 @pytest.mark.asyncio

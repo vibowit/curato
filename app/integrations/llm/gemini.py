@@ -23,7 +23,6 @@ class GeminiLLMClient:
     DEFAULT_MODELS: List[str] = [
         "gemini-3.5-flash-lite",
         "gemini-flash-lite-latest",
-        "gemini-3.5-flash",
     ]
 
     _cached_working_model: Optional[str] = None
@@ -41,7 +40,11 @@ class GeminiLLMClient:
         self._api_key = raw_key
         # Check explicit model, then cached working model, then config, then default
         configured_model = model or self._cached_working_model or settings.GEMINI_MODEL
-        if configured_model and any(v in configured_model for v in ("1.5", "2.0", "2.5")):
+        # Normalize deprecated or non-lite models (which have harsh rate limits) to lite
+        if configured_model and (
+            any(v in configured_model for v in ("1.5", "2.0", "2.5"))
+            or configured_model in ("gemini-3.5-flash", "gemini-flash-latest", "gemini-3.8-flash")
+        ):
             configured_model = "gemini-3.5-flash-lite"
 
         self._model = configured_model or self.DEFAULT_MODELS[0]
@@ -142,7 +145,7 @@ class GeminiLLMClient:
                 url = f"{self.BASE_URL}/{api_ver}/models/{model_candidate}:generateContent"
                 params = {"key": self._api_key}
 
-                for attempt in range(2):
+                for attempt in range(3):
                     try:
                         response = await client.post(
                             url,
@@ -182,10 +185,11 @@ class GeminiLLMClient:
                             details={"provider": "gemini", "status_code": response.status_code},
                         )
 
-                    # For transient 503, retry once after short backoff
-                    if response.status_code == 503 and attempt == 0:
-                        logger.debug("503 on %s, retrying in 0.5s...", model_candidate)
-                        await asyncio.sleep(0.5)
+                    # For transient 503, retry up to 2 times after backoff
+                    if response.status_code == 503 and attempt < 2:
+                        backoff = 0.5 * (attempt + 1)
+                        logger.debug("503 on %s, retrying in %.1fs...", model_candidate, backoff)
+                        await asyncio.sleep(backoff)
                         continue
 
                     if response.status_code in (404, 429, 500, 502, 503, 504):
