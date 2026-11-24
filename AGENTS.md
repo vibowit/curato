@@ -54,6 +54,9 @@ Przed większą zmianą przeczytaj kluczowe dokumenty projektowe w `docs/`:
     otwierać własną, krótką sesję `SessionLocal()` w bloku kontekstowym;
     nigdy nie współdziel sesji pomiędzy taskami asyncio ani nie trzymaj
     otwartej transakcji podczas oczekiwania na zewnętrzne API.
+-   Stan UI i timeouty API: każde żądanie asynchroniczne z frontendu musi
+    posiadać limit czasu (`AbortController`), aby przyciski akcji nigdy nie
+    pozostawały trwale zablokowane w razie awarii sieci lub upstreamu.
 
 ## Praca z LLM
 
@@ -63,6 +66,11 @@ Przed większą zmianą przeczytaj kluczowe dokumenty projektowe w `docs/`:
 -   `match_score` nie jest prawdopodobieństwem.
 -   Zachowuj provider/model, wersję profilu i parametry każdego
     przebiegu.
+-   Priorytet modeli Lite i fail-fast: w środowiskach bezpłatnych/deweloperskich
+    preferuj warianty Lite (wysokie limity RPM vs restrykcyjne dzienne RPD
+    modeli pełnych). Łańcuchy fallbacków muszą działać w trybie fail-fast
+    (krótkie timeouty, natychmiastowe przejście do rankera heurystycznego),
+    nigdy nie blokując użytkownika wielominutowym odpytywaniem nieaktywnych modeli.
 
 ## Testy i Definition of Done
 
@@ -71,6 +79,8 @@ Przed większą zmianą przeczytaj kluczowe dokumenty projektowe w `docs/`:
 -   Testuj integracje z mockami; testy live oznaczaj oddzielnie.
 -   Do mockowania zapytań HTTP w testach używaj wyłącznie wbudowanego
     `httpx.MockTransport` (bez doinstalowywania respx/responses).
+-   Migracje bazy: po utworzeniu nowej migracji Alembic natychmiast wykonaj
+    `alembic upgrade head` w środowisku lokalnym przed uruchomieniem testów.
 -   Testuj deduplikację, brak rekomendacji obejrzanych i brak zapisu bez
     akceptacji.
 -   Testuj ponowienie operacji Simkl bez duplikatów.
