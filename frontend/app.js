@@ -17,7 +17,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // DOM Elements
   const langSelect = document.getElementById("lang-select");
-  const inputRunLanguage = document.getElementById("input-run-language");
+  const runActiveLangLabel = document.getElementById("run-active-lang-label");
   const profilePillText = document.getElementById("profile-pill-text");
   const btnProfile = document.getElementById("btn-profile");
   const modalProfile = document.getElementById("modal-profile");
@@ -108,20 +108,12 @@ document.addEventListener("DOMContentLoaded", () => {
         state.currentLang = langCodes.includes("pl") ? "pl" : langCodes[0] || "pl";
       }
 
-      // Populate language selector in header
+      // Populate language selector in header (compact flag + code format)
       if (langSelect) {
         langSelect.innerHTML = state.languages
-          .map((l) => `<option value="${l.code}">${l.flag || "🌐"} ${l.name}</option>`)
+          .map((l) => `<option value="${l.code}" title="${l.name}">${l.flag || "🌐"} ${l.code.toUpperCase()}</option>`)
           .join("");
         langSelect.value = state.currentLang;
-      }
-
-      // Populate language selector in "New Run" modal
-      if (inputRunLanguage) {
-        inputRunLanguage.innerHTML = state.languages
-          .map((l) => `<option value="${l.code}">${l.flag || "🌐"} ${l.name}</option>`)
-          .join("");
-        inputRunLanguage.value = state.currentLang;
       }
 
       // Fetch dictionary for current language
@@ -143,8 +135,11 @@ document.addEventListener("DOMContentLoaded", () => {
       if (langSelect && langSelect.value !== code) {
         langSelect.value = code;
       }
-      if (inputRunLanguage && inputRunLanguage.value !== code) {
-        inputRunLanguage.value = code;
+
+      if (runActiveLangLabel) {
+        const langObj = state.languages.find((l) => l.code === code);
+        const name = langObj ? langObj.name : code;
+        runActiveLangLabel.textContent = `${name} (${code.toUpperCase()})`;
       }
 
       // Update static elements with data-i18n attribute
@@ -773,7 +768,27 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // New Run Modal & Submission
   btnNewRun.addEventListener("click", () => {
+    if (runActiveLangLabel) {
+      const langObj = state.languages.find((l) => l.code === state.currentLang);
+      const name = langObj ? langObj.name : state.currentLang;
+      runActiveLangLabel.textContent = `${name} (${state.currentLang.toUpperCase()})`;
+    }
     modalNewRun.classList.remove("hidden");
+  });
+
+  // Stepper buttons in New Run Modal (+ / - buttons)
+  document.querySelectorAll(".stepper-btn").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const targetId = btn.dataset.stepTarget;
+      const step = Number(btn.dataset.step) || 0;
+      const input = document.getElementById(targetId);
+      if (!input) return;
+      const min = Number(input.min) || 1;
+      const max = Number(input.max) || 100;
+      const currentVal = Number(input.value) || min;
+      const nextVal = Math.min(Math.max(currentVal + step, min), max);
+      input.value = nextVal;
+    });
   });
 
   formNewRun.addEventListener("submit", async (e) => {
@@ -790,7 +805,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const showLimit = Number(document.getElementById("input-show-limit").value) || 5;
     const excludeAnim = document.getElementById("input-exclude-animation").checked;
     const includeWildcards = document.getElementById("input-include-wildcards") ? document.getElementById("input-include-wildcards").checked : true;
-    const runLang = document.getElementById("input-run-language")?.value || state.currentLang;
+    const runLang = state.currentLang;
 
     const btnSubmit = document.getElementById("btn-submit-run");
     btnSubmit.disabled = true;
