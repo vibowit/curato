@@ -70,7 +70,8 @@
     "history_col_decision": "Decyzja",
     "history_col_edition": "Edycja",
     "history_col_date": "Data",
-    "history_empty": "Brak zapisanych decyzji w historii."
+    "history_empty": "Brak zapisanych decyzji w historii.",
+    "error_timeout": "Przekroczono limit czasu żądania (timeout). Spróbuj ponownie za chwilę."
   },
   "prompts": {
     "taste_profile": {

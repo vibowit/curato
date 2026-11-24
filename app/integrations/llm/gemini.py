@@ -1,3 +1,4 @@
+import asyncio
 import json
 import logging
 import re
@@ -20,12 +21,9 @@ class GeminiLLMClient:
 
     BASE_URL: str = "https://generativelanguage.googleapis.com"
     DEFAULT_MODELS: List[str] = [
-        "gemini-2.0-flash",
-        "gemini-1.5-flash",
-        "gemini-1.5-flash-latest",
-        "gemini-2.0-flash-exp",
-        "gemini-1.5-pro",
-        "gemini-1.5-pro-latest",
+        "gemini-3.5-flash-lite",
+        "gemini-flash-lite-latest",
+        "gemini-3.5-flash",
     ]
 
     _cached_working_model: Optional[str] = None
@@ -34,7 +32,7 @@ class GeminiLLMClient:
         self,
         api_key: Optional[str] = None,
         model: Optional[str] = None,
-        timeout: float = 30.0,
+        timeout: float = 15.0,
         client: Optional[httpx.AsyncClient] = None,
     ):
         raw_key = api_key or (
@@ -43,8 +41,8 @@ class GeminiLLMClient:
         self._api_key = raw_key
         # Check explicit model, then cached working model, then config, then default
         configured_model = model or self._cached_working_model or settings.GEMINI_MODEL
-        if configured_model and "2.5" in configured_model:
-            configured_model = "gemini-2.0-flash"
+        if configured_model and any(v in configured_model for v in ("1.5", "2.0", "2.5")):
+            configured_model = "gemini-3.5-flash-lite"
 
         self._model = configured_model or self.DEFAULT_MODELS[0]
         self.timeout = timeout
@@ -86,8 +84,13 @@ class GeminiLLMClient:
                     data = res.json()
                     for m in data.get("models", []):
                         methods = m.get("supportedGenerationMethods", [])
-                        if "generateContent" in methods:
-                            name = m.get("name", "").replace("models/", "")
+                        name = m.get("name", "").replace("models/", "")
+                        bad_keywords = ("image", "tts", "audio", "embed")
+                        if (
+                            "generateContent" in methods
+                            and not any(bad in name.lower() for bad in bad_keywords)
+                            and not any(dead in name for dead in ("1.5", "2.0", "2.5"))
+                        ):
                             discovered.append((name, api_version))
                     if discovered:
                         break
@@ -98,8 +101,8 @@ class GeminiLLMClient:
         return sorted(
             discovered,
             key=lambda item: (
-                0 if "flash" in item[0].lower() else 1,
-                0 if "2" in item[0] else 1,
+                0 if "flash-lite" in item[0].lower() else 1,
+                0 if "flash" in item[0].lower() else 2,
                 item[0],
             ),
         )
@@ -125,102 +128,91 @@ class GeminiLLMClient:
         if system_instruction:
             payload["systemInstruction"] = {"parts": [{"text": system_instruction}]}
 
-        # Try designated model, and fall back to alternatives if model not found (404)
+        # Try designated model, and fall back to alternatives if model not found or rate limited
         models_to_try: List[Tuple[str, str]] = [(self._model, "v1beta")] + [
             (m, "v1beta") for m in self.DEFAULT_MODELS if m != self._model
         ]
         last_error: Optional[str] = None
+        tried_models = set()
 
         client = self._get_client()
         try:
             for model_candidate, api_ver in models_to_try:
+                tried_models.add(model_candidate)
                 url = f"{self.BASE_URL}/{api_ver}/models/{model_candidate}:generateContent"
                 params = {"key": self._api_key}
 
-                try:
-                    response = await client.post(
-                        url,
-                        params=params,
-                        json=payload,
-                        headers={"Content-Type": "application/json"},
-                    )
-                except httpx.TimeoutException as exc:
-                    logger.error("Timeout calling Gemini API (%s): %s", model_candidate, exc)
-                    raise UpstreamErrorException(
-                        message=f"Gemini API timed out after {self.timeout}s",
-                        details={"provider": "gemini", "model": model_candidate},
-                    ) from exc
-                except httpx.RequestError as exc:
-                    logger.error("Network error calling Gemini API (%s): %s", model_candidate, exc)
-                    raise UpstreamErrorException(
-                        message="Network error communicating with Gemini API",
-                        details={"provider": "gemini", "error": str(exc)},
-                    ) from exc
+                for attempt in range(2):
+                    try:
+                        response = await client.post(
+                            url,
+                            params=params,
+                            json=payload,
+                            headers={"Content-Type": "application/json"},
+                        )
+                    except httpx.TimeoutException as exc:
+                        logger.warning(
+                            "Timeout calling Gemini API (%s): %s, trying fallback...",
+                            model_candidate,
+                            exc,
+                        )
+                        last_error = f"Model {model_candidate} timed out"
+                        break
+                    except httpx.RequestError as exc:
+                        logger.warning(
+                            "Network error calling Gemini API (%s): %s, trying fallback...",
+                            model_candidate,
+                            exc,
+                        )
+                        last_error = f"Model {model_candidate} network error: {exc}"
+                        break
 
-                if response.status_code == 200:
-                    self._model = model_candidate
-                    GeminiLLMClient._cached_working_model = model_candidate
-                    return self._parse_response(response.json())
+                    if response.status_code == 200:
+                        self._model = model_candidate
+                        GeminiLLMClient._cached_working_model = model_candidate
+                        return self._parse_response(response.json())
 
-                if response.status_code in (401, 403):
+                    if response.status_code in (401, 403):
+                        logger.error(
+                            "Authentication failed for Gemini API (HTTP %d)",
+                            response.status_code,
+                        )
+                        raise AuthRequiredException(
+                            message="Invalid or unauthorized Gemini API key.",
+                            details={"provider": "gemini", "status_code": response.status_code},
+                        )
+
+                    # For transient 503, retry once after short backoff
+                    if response.status_code == 503 and attempt == 0:
+                        logger.debug("503 on %s, retrying in 0.5s...", model_candidate)
+                        await asyncio.sleep(0.5)
+                        continue
+
+                    if response.status_code in (404, 429, 500, 502, 503, 504):
+                        logger.warning(
+                            "Model %s returned HTTP %d on Gemini API, trying fallback...",
+                            model_candidate,
+                            response.status_code,
+                        )
+                        last_error = f"Model {model_candidate} returned HTTP {response.status_code}"
+                        break
+
+                    # Any other HTTP error
                     logger.error(
-                        "Authentication failed for Gemini API (HTTP %d)",
+                        "Gemini API returned HTTP %d: %s",
                         response.status_code,
+                        response.text[:200],
                     )
-                    raise AuthRequiredException(
-                        message="Invalid or unauthorized Gemini API key.",
+                    raise UpstreamErrorException(
+                        message=f"Gemini API returned error: HTTP {response.status_code}",
                         details={"provider": "gemini", "status_code": response.status_code},
                     )
 
-                if response.status_code == 429:
-                    logger.warning("Gemini API rate limit reached (HTTP 429)")
-                    raise RateLimitedException(
-                        message="Gemini API rate limit exceeded. Please retry later.",
-                        details={"provider": "gemini"},
-                    )
-
-                if response.status_code == 404:
-                    logger.info(
-                        "Model %s not found on Gemini API, trying fallback...",
-                        model_candidate,
-                    )
-                    last_error = f"Model {model_candidate} returned 404"
-                    continue
-
-                # Any other HTTP error
-                logger.error(
-                    "Gemini API returned HTTP %d: %s",
-                    response.status_code,
-                    response.text[:200],
+            if last_error and "429" in last_error:
+                raise RateLimitedException(
+                    message=f"Gemini API rate limit exceeded across fallback models: {last_error}",
+                    details={"provider": "gemini"},
                 )
-                raise UpstreamErrorException(
-                    message=f"Gemini API returned error: HTTP {response.status_code}",
-                    details={"provider": "gemini", "status_code": response.status_code},
-                )
-
-            # If all static candidates returned 404, discover supported models dynamically
-            logger.info("Static model candidates failed; discovering models dynamically...")
-            discovered = await self.discover_models(client)
-            for model_candidate, api_ver in discovered:
-                url = f"{self.BASE_URL}/{api_ver}/models/{model_candidate}:generateContent"
-                params = {"key": self._api_key}
-                try:
-                    response = await client.post(
-                        url,
-                        params=params,
-                        json=payload,
-                        headers={"Content-Type": "application/json"},
-                    )
-                    if response.status_code == 200:
-                        self._model = model_candidate
-                        return self._parse_response(response.json())
-                    last_error = (
-                        f"Model {model_candidate} ({api_ver}) returned HTTP {response.status_code}"
-                    )
-                except Exception as e:
-                    last_error = str(e)
-                    continue
-
             raise UpstreamErrorException(
                 message=f"No compatible Gemini model found. Last error: {last_error}",
                 details={"provider": "gemini"},
@@ -252,8 +244,10 @@ class GeminiLLMClient:
 
         try:
             parsed = json.loads(clean_text)
+            if isinstance(parsed, list):
+                parsed = {"evaluations": parsed}
             if not isinstance(parsed, dict):
-                raise ValueError("Parsed JSON is not an object/dictionary")
+                raise ValueError("Parsed JSON is not an object/dictionary or list")
             return parsed
         except (json.JSONDecodeError, ValueError) as exc:
             logger.error(

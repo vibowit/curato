@@ -65,8 +65,17 @@ document.addEventListener("DOMContentLoaded", () => {
       "Content-Type": "application/json",
       ...(options.headers || {}),
     };
+    const controller = new AbortController();
+    const timeoutMs = options.timeoutMs || 90000;
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
     try {
-      const resp = await fetch(path, { ...options, headers });
+      const resp = await fetch(path, {
+        ...options,
+        headers,
+        signal: options.signal || controller.signal,
+      });
+      clearTimeout(timeoutId);
       if (!resp.ok) {
         let errData = {};
         try {
@@ -78,6 +87,10 @@ document.addEventListener("DOMContentLoaded", () => {
       if (resp.status === 204) return null;
       return await resp.json();
     } catch (err) {
+      clearTimeout(timeoutId);
+      if (err.name === "AbortError") {
+        throw new Error(t("error_timeout", "Przekroczono limit czasu żądania (timeout). Spróbuj ponownie za chwilę."));
+      }
       console.error(`API Error on ${path}:`, err);
       throw err;
     }

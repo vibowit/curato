@@ -28,7 +28,7 @@ async def test_gemini_client_success():
     }
 
     def mock_handler(request: httpx.Request):
-        assert "models/gemini-2.0-flash:generateContent" in str(request.url)
+        assert "models/gemini-3.5-flash-lite:generateContent" in str(request.url)
         assert request.url.params.get("key") == "fake_gemini_key"
         body = json.loads(request.content.decode("utf-8"))
         assert "contents" in body
@@ -46,13 +46,13 @@ async def test_gemini_client_success():
     result = await gemini.generate_structured("Prompt text", system_instruction="System rule")
     assert result == expected_result
     assert gemini.provider_name == "gemini"
-    assert gemini.model_name == "gemini-2.0-flash"
+    assert gemini.model_name == "gemini-3.5-flash-lite"
 
 
 @pytest.mark.asyncio
 async def test_gemini_client_normalizes_obsolete_model():
     gemini = GeminiLLMClient(api_key="fake_key", model="gemini-2.5-flash")
-    assert gemini.model_name == "gemini-2.0-flash"
+    assert gemini.model_name == "gemini-3.5-flash-lite"
 
 
 @pytest.mark.asyncio
@@ -86,9 +86,9 @@ async def test_gemini_client_fallback_on_404():
     def mock_handler(request: httpx.Request):
         url_str = str(request.url)
         calls.append(url_str)
-        if "gemini-2.0-flash" in url_str:
+        if "gemini-3.5-flash-lite" in url_str:
             return httpx.Response(404, json={"error": {"message": "Model not found"}})
-        if "gemini-1.5-flash" in url_str:
+        if "gemini-flash-lite-latest" in url_str:
             return httpx.Response(
                 200,
                 json={
@@ -108,7 +108,7 @@ async def test_gemini_client_fallback_on_404():
 
     res = await gemini.generate_structured("Prompt")
     assert res == {"summary": "Fallback model works"}
-    assert gemini.model_name == "gemini-1.5-flash"
+    assert gemini.model_name == "gemini-flash-lite-latest"
     assert len(calls) == 2
 
 

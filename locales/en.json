@@ -70,7 +70,8 @@
     "history_col_decision": "Decision",
     "history_col_edition": "Edition",
     "history_col_date": "Date",
-    "history_empty": "No recorded decisions in history."
+    "history_empty": "No recorded decisions in history.",
+    "error_timeout": "Request timed out. Please try again in a moment."
   },
   "prompts": {
     "taste_profile": {
