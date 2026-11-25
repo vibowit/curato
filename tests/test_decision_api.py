@@ -108,4 +108,4 @@ def test_post_approve_endpoint(mock_add_to_list, app_client: TestClient, db_sess
 def test_frontend_index_served(app_client: TestClient):
     response = app_client.get("/")
     assert response.status_code == 200
-    assert "Simkl Recommender" in response.text
+    assert "Curato" in response.text
