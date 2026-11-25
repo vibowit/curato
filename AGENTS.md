@@ -75,7 +75,9 @@ Przed większą zmianą przeczytaj kluczowe dokumenty projektowe w `docs/`:
 ## Testy i Definition of Done
 
 -   Dodaj testy do każdej nowej logiki (TDD/BFF: weryfikacja błędu/test, potem minimalna implementacja).
--   Przed i po zmianach uruchom linter i testy (`ruff`, `pytest`).
+-   Przed i po zmianach uruchom linter i testy zgodnie z CI (`ruff check app tests`, `pytest`).
+-   Praca w `git worktree`: jeśli worktree nie posiada własnego `.venv`, uruchom testy korzystając z `.venv` repozytorium głównego przed zmergowaniem do `main`.
+-   Zmiany stringów UI / marki: przed zatwierdzeniem zmian w `frontend/` lub `locales/`, przeszukaj `tests/` pod kątem asercji HTML i tłumaczeń (np. `test_decision_api.py`, `test_language_api.py`).
 -   Testuj integracje z mockami; testy live oznaczaj oddzielnie.
 -   Do mockowania zapytań HTTP w testach używaj wyłącznie wbudowanego
     `httpx.MockTransport` (bez doinstalowywania respx/responses).
