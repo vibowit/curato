@@ -19,7 +19,12 @@ document.addEventListener("DOMContentLoaded", () => {
   const langSelect = document.getElementById("lang-select");
   const runActiveLangLabel = document.getElementById("run-active-lang-label");
   const profilePillText = document.getElementById("profile-pill-text");
+  const profileStatusDot = document.getElementById("profile-status-dot");
   const btnProfile = document.getElementById("btn-profile");
+  const btnMobileMenu = document.getElementById("btn-mobile-menu");
+  const headerUtils = document.getElementById("header-utils");
+  const btnToggleSummary = document.getElementById("btn-toggle-summary");
+  const runSummaryBox = document.getElementById("run-summary-box");
   const modalProfile = document.getElementById("modal-profile");
   const profileContentContainer = document.getElementById("profile-content-container");
   const btnGenerateProfile = document.getElementById("btn-generate-profile");
@@ -49,8 +54,13 @@ document.addEventListener("DOMContentLoaded", () => {
   function showToast(message, type = "info") {
     const toast = document.createElement("div");
     toast.className = `toast toast-${type}`;
-    const icon = type === "success" ? "✅" : type === "error" ? "❌" : "ℹ️";
-    toast.innerHTML = `<span>${icon}</span> <div>${message}</div>`;
+    const iconSvg =
+      type === "success"
+        ? `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>`
+        : type === "error"
+        ? `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#f43f5e" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>`
+        : `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6366f1" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>`;
+    toast.innerHTML = `${iconSvg} <div>${message}</div>`;
     toastContainer.appendChild(toast);
     setTimeout(() => {
       toast.style.opacity = "0";
@@ -108,10 +118,10 @@ document.addEventListener("DOMContentLoaded", () => {
         state.currentLang = langCodes.includes("pl") ? "pl" : langCodes[0] || "pl";
       }
 
-      // Populate language selector in header (compact flag + code format)
+      // Populate language selector in header (clean code format without flag emoji)
       if (langSelect) {
         langSelect.innerHTML = state.languages
-          .map((l) => `<option value="${l.code}" title="${l.name}">${l.flag || "🌐"} ${l.code.toUpperCase()}</option>`)
+          .map((l) => `<option value="${l.code}" title="${l.name}">${l.code.toUpperCase()}</option>`)
           .join("");
         langSelect.value = state.currentLang;
       }
@@ -152,11 +162,7 @@ document.addEventListener("DOMContentLoaded", () => {
       });
 
       // Update dynamic UI parts
-      if (state.activeProfile && profilePillText) {
-        profilePillText.textContent = `${t("profile_active", "Profil: Aktywny")}: ${state.activeProfile.version}`;
-      } else if (profilePillText) {
-        profilePillText.textContent = t("profile_none", "Profil: Brak");
-      }
+      updateProfilePill();
 
       updateApprovalBar();
       if (state.recommendations && state.recommendations.length > 0) {
@@ -173,20 +179,27 @@ document.addEventListener("DOMContentLoaded", () => {
     await Promise.all([loadProfile(), loadRuns()]);
   }
 
+  function updateProfilePill() {
+    if (!profilePillText) return;
+    if (state.activeProfile) {
+      const label = state.currentLang === "en" ? "Taste" : "Gust";
+      profilePillText.textContent = `${label}: ${state.activeProfile.version}`;
+      if (profileStatusDot) profileStatusDot.classList.add("active");
+    } else {
+      profilePillText.textContent = t("profile_none", "Brak profilu");
+      if (profileStatusDot) profileStatusDot.classList.remove("active");
+    }
+  }
+
   // Load Active Taste Profile
   async function loadProfile() {
     try {
       const data = await api("/api/profile");
       state.activeProfile = data;
-      if (profilePillText) {
-        profilePillText.textContent = `${t("profile_active", "Profil: Aktywny")}: ${data.version}`;
-      }
     } catch (err) {
       state.activeProfile = null;
-      if (profilePillText) {
-        profilePillText.textContent = t("profile_none", "Profil: Brak");
-      }
     }
+    updateProfilePill();
   }
 
   // Load All Recommendation Runs
@@ -262,8 +275,30 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
+  function updateFilterCounts() {
+    const type = state.filters.type;
+    const base = type === "all"
+      ? state.recommendations
+      : state.recommendations.filter((r) => r.media_item && r.media_item.media_type === type);
+
+    const counts = {
+      all: base.length,
+      pending: base.filter((r) => r.status === "pending").length,
+      accepted: base.filter((r) => r.status === "accepted").length,
+      added: base.filter((r) => r.status === "added").length,
+      rejected: base.filter((r) => r.status === "rejected").length,
+      seen: base.filter((r) => r.status === "seen").length,
+    };
+
+    Object.entries(counts).forEach(([key, val]) => {
+      const el = document.querySelector(`[data-count-for="${key}"]`);
+      if (el) el.textContent = val;
+    });
+  }
+
   // Render Filtered Cards
   function renderRecommendations() {
+    updateFilterCounts();
     const { type, status } = state.filters;
     let filtered = state.recommendations;
 
@@ -277,7 +312,10 @@ document.addEventListener("DOMContentLoaded", () => {
     if (filtered.length === 0) {
       recsContainer.innerHTML = `
         <div class="empty-state">
-          <span style="font-size: 3rem;">🔍</span>
+          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="11" cy="11" r="8"></circle>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+          </svg>
           <h3>${t("no_recommendations", "Brak pozycji dla wybranych filtrów")}</h3>
           <p>${t("filter_status_all", "Zmień kryteria filtrowania, aby zobaczyć inne rekomendacje.")}</p>
         </div>
@@ -322,37 +360,46 @@ document.addEventListener("DOMContentLoaded", () => {
     const currentStatus = statusMap[rec.status] || { label: rec.status, class: "badge-status-pending" };
 
     const posFactorsHtml = (rec.positive_factors || [])
-      .map((f) => `<span class="factor-tag factor-positive">✓ ${f}</span>`)
+      .map((f) => `<span class="factor-tag factor-positive">+ ${f}</span>`)
       .join("");
 
     const risksHtml = (rec.risks || [])
-      .map((r) => `<span class="factor-tag factor-risk">⚠ ${r}</span>`)
+      .map((r) => `<span class="factor-tag factor-risk">− ${r}</span>`)
       .join("");
+
+    const statusBadgeHtml = rec.status !== "pending"
+      ? `<span class="badge ${currentStatus.class}" id="status-badge-${rec.id}">${currentStatus.label}</span>`
+      : "";
 
     card.innerHTML = `
       <div class="card-poster-wrap">
         ${posterUrl
-          ? `<img src="${posterUrl}" alt="${title}" class="card-poster" loading="lazy" onerror="this.onerror=null; this.parentElement.innerHTML='<div class=\\'card-poster-placeholder\\'>🎬</div>';">`
-          : `<div class="card-poster-placeholder">${isMovie ? "🎬" : "📺"}</div>`
+          ? `<img src="${posterUrl}" alt="${title}" class="card-poster" loading="lazy" onerror="this.onerror=null; this.parentElement.innerHTML='<div class=\\'card-poster-placeholder\\'><svg width=\\'36\\' height=\\'36\\' viewBox=\\'0 0 24 24\\' fill=\\'none\\' stroke=\\'currentColor\\' stroke-width=\\'1.5\\'><rect x=\\'2\\' y=\\'2\\' width=\\'20\\' height=\\'20\\' rx=\\'2.18\\'></rect><line x1=\\'7\\' y1=\\'2\\' x2=\\'7\\' y2=\\'22\\'></line><line x1=\\'17\\' y1=\\'2\\' x2=\\'17\\' y2=\\'22\\'></line></svg></div>';">`
+          : `<div class="card-poster-placeholder"><svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="2" width="20" height="20" rx="2.18"></rect><line x1="7" y1="2" x2="7" y2="22"></line><line x1="17" y1="2" x2="17" y2="22"></line></svg></div>`
         }
         <div class="card-poster-overlay">
-          <span class="badge ${typeBadgeClass}">${typeLabel}</span>
-          ${rec.is_wildcard ? `<span class="badge badge-wildcard">${t("badge_wildcard", "🎲 Zaskocz mnie")}</span>` : ""}
-          <span class="badge ${currentStatus.class}" id="status-badge-${rec.id}">${currentStatus.label}</span>
+          <div class="poster-badges-left">
+            <span class="badge ${typeBadgeClass}">${typeLabel}</span>
+            ${rec.is_wildcard ? `<span class="badge badge-wildcard">${t("badge_wildcard", "Zaskocz mnie")}</span>` : ""}
+          </div>
+          ${statusBadgeHtml}
         </div>
+        <button class="btn-poster-play" data-action="trailer" data-id="${rec.id}" title="${t("btn_trailer", "Zwiastun")}">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" stroke="none">
+            <polygon points="5 3 19 12 5 21 5 3"></polygon>
+          </svg>
+          <span>${t("btn_trailer", "Zwiastun")}</span>
+        </button>
       </div>
       <div class="card-body">
         <div class="card-title-row">
           <h3 class="card-title">${title}</h3>
           <span class="card-year">${year}</span>
         </div>
-        <div class="card-match-bar">
-          <span class="match-score-badge" title="Score: ${matchPercent}%">${matchPercent}%</span>
-          ${tmdbRating ? `<span class="rating-badge" title="TMDB Community Rating">★ ${tmdbRating}</span>` : ""}
-          ${isLowConfidence ? `<span class="warning-badge" title="${t("tooltip_low_metadata", "Ograniczone metadane w bazie dla tego tytułu")}">⚠️ ${t("badge_low_metadata", "Mało danych")}</span>` : ""}
-          <button class="btn-card-trailer" data-action="trailer" data-id="${rec.id}" title="${t("btn_trailer", "Zwiastun")}">
-            🎬 ${t("btn_trailer", "Zwiastun")}
-          </button>
+        <div class="card-metrics-row">
+          <span class="match-score-pill" title="Dopasowanie: ${matchPercent}%">${matchPercent}%</span>
+          ${tmdbRating ? `<span class="rating-pill" title="TMDB Community Rating">★ ${tmdbRating}</span>` : ""}
+          ${isLowConfidence ? `<span class="low-data-icon" title="${t("tooltip_low_metadata", "Ograniczone metadane w bazie dla tego tytułu")}"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg></span>` : ""}
         </div>
         <div class="card-reason">
           ${rec.reason}
@@ -364,18 +411,26 @@ document.addEventListener("DOMContentLoaded", () => {
           </div>
         ` : ""}
         <div class="card-actions">
-          <button class="action-btn btn-accept ${rec.status === "accepted" ? "active" : ""}" data-action="accept" data-id="${rec.id}">
-            ✓ ${t("btn_accept", "Zaakceptuj")}
-          </button>
-          <button class="action-btn btn-reject ${rec.status === "rejected" ? "active" : ""}" data-action="reject" data-id="${rec.id}">
-            ✗ ${t("btn_reject", "Odrzuć")}
-          </button>
-          <button class="action-btn btn-seen ${rec.status === "seen" ? "active" : ""}" data-action="seen" data-id="${rec.id}">
-            👁 ${t("btn_seen", "Widziałem")}
-          </button>
-          <button class="action-btn btn-later ${rec.status === "pending" ? "active" : ""}" data-action="later" data-id="${rec.id}">
-            ⏱ ${t("btn_later", "Później")}
-          </button>
+          <div class="card-actions-primary">
+            <button class="action-btn action-btn-main btn-accept ${rec.status === "accepted" ? "active" : ""}" data-action="accept" data-id="${rec.id}">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+              <span>${t("btn_accept", "Zaakceptuj")}</span>
+            </button>
+            <button class="action-btn action-btn-main btn-reject ${rec.status === "rejected" ? "active" : ""}" data-action="reject" data-id="${rec.id}">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+              <span>${t("btn_reject", "Odrzuć")}</span>
+            </button>
+          </div>
+          <div class="card-actions-secondary">
+            <button class="action-btn action-btn-sub btn-seen ${rec.status === "seen" ? "active" : ""}" data-action="seen" data-id="${rec.id}">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+              <span>${t("btn_seen", "Widziałem")}</span>
+            </button>
+            <button class="action-btn action-btn-sub btn-later" data-action="later" data-id="${rec.id}">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+              <span>${t("btn_later", "Później")}</span>
+            </button>
+          </div>
         </div>
       </div>
     `;
@@ -753,18 +808,35 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // Sync Simkl
   btnSync.addEventListener("click", async () => {
+    const origHtml = btnSync.innerHTML;
     btnSync.disabled = true;
-    btnSync.innerHTML = `<span class="icon">⏳</span> ${t("toast_sync_started", "Synchronizacja...")}`;
+    btnSync.textContent = t("toast_sync_started", "Synchronizacja...");
     try {
-      const res = await api("/api/sync/simkl", { method: "POST" });
+      await api("/api/sync/simkl", { method: "POST" });
       showToast(t("toast_sync_success", "Synchronizacja z Simkl zakończona pomyślnie!"), "success");
     } catch (err) {
       showToast(`Sync error: ${err.message}`, "error");
     } finally {
       btnSync.disabled = false;
-      btnSync.innerHTML = `<span class="icon">🔄</span> ${t("btn_sync", "Sync Simkl")}`;
+      btnSync.innerHTML = origHtml;
     }
   });
+
+  // Mobile Menu Toggle
+  if (btnMobileMenu && headerUtils) {
+    btnMobileMenu.addEventListener("click", () => {
+      const isOpen = headerUtils.classList.toggle("open");
+      btnMobileMenu.setAttribute("aria-expanded", String(isOpen));
+    });
+  }
+
+  // Collapsible Run Summary Toggle
+  if (btnToggleSummary && runSummaryBox) {
+    btnToggleSummary.addEventListener("click", () => {
+      const isCollapsed = runSummaryBox.classList.toggle("collapsed");
+      btnToggleSummary.setAttribute("aria-expanded", String(!isCollapsed));
+    });
+  }
 
   // New Run Modal & Submission
   btnNewRun.addEventListener("click", () => {

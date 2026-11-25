@@ -31,7 +31,7 @@ def test_get_language_locale(client: TestClient):
     assert response_en.status_code == 200
     data_en = response_en.json()
     assert data_en["code"] == "en"
-    assert data_en["ui"]["brand_title"] == "Simkl Recommender"
+    assert data_en["ui"]["brand_title"] == "Curato"
 
 
 def test_get_language_fallback(client: TestClient):

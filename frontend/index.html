@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Simkl Taste & Recommendation Engine</title>
+  <title>Curato — AI Movie & TV Recommender</title>
   <link rel="stylesheet" href="/styles.css">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -14,30 +14,77 @@
   <header class="header">
     <div class="header-container">
       <div class="brand">
-        <span class="brand-icon">🎬</span>
-        <div>
-          <h1 class="brand-title" data-i18n="brand_title">Simkl Recommender</h1>
-          <p class="brand-subtitle" data-i18n="brand_subtitle">Prywatny silnik rekomendacji filmów i seriali</p>
+        <div class="brand-logo" aria-hidden="true">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18"></rect>
+            <line x1="7" y1="2" x2="7" y2="22"></line>
+            <line x1="17" y1="2" x2="17" y2="22"></line>
+            <line x1="2" y1="12" x2="22" y2="12"></line>
+            <line x1="2" y1="7" x2="7" y2="7"></line>
+            <line x1="2" y1="17" x2="7" y2="17"></line>
+            <line x1="17" y1="17" x2="22" y2="17"></line>
+            <line x1="17" y1="7" x2="22" y2="7"></line>
+          </svg>
+        </div>
+        <div class="brand-text">
+          <h1 class="brand-title" data-i18n="brand_title">Curato</h1>
+          <span class="brand-subtitle" data-i18n="brand_subtitle">AI Recommender</span>
         </div>
       </div>
-      <div class="header-actions">
-        <!-- Language selector -->
-        <div class="lang-picker">
-          <select id="lang-select" class="select-lang" aria-label="Language selection" title="Wybierz język">
-            <!-- Dynamically populated from /api/v1/languages -->
-          </select>
+
+      <!-- Desktop & Mobile Actions -->
+      <div class="header-right">
+        <div id="header-utils" class="header-utils">
+          <button id="btn-profile" class="btn btn-profile-pill" title="Kliknij, aby zobaczyć lub wygenerować profil gustu">
+            <span class="status-dot" id="profile-status-dot"></span>
+            <span id="profile-pill-text" data-i18n="profile_loading">Gust: Ładowanie...</span>
+          </button>
+
+          <button id="btn-sync" class="btn btn-ghost" title="Synchronizuj bibliotekę z Simkl">
+            <svg class="icon-svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path>
+              <path d="M3 3v5h5"></path>
+              <path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"></path>
+              <path d="M16 16h5v5"></path>
+            </svg>
+            <span data-i18n="btn_sync">Sync Simkl</span>
+          </button>
+
+          <button id="btn-history" class="btn btn-ghost" title="Historia podjętych decyzji">
+            <svg class="icon-svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path>
+              <path d="M3 3v5h5"></path>
+              <path d="M12 7v5l4 2"></path>
+            </svg>
+            <span data-i18n="btn_history">Historia</span>
+          </button>
+
+          <div class="lang-picker">
+            <svg class="lang-globe-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="10"></circle>
+              <line x1="2" y1="12" x2="22" y2="12"></line>
+              <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
+            </svg>
+            <select id="lang-select" class="select-lang" aria-label="Language selection" title="Wybierz język">
+              <!-- Dynamically populated from /api/v1/languages -->
+            </select>
+          </div>
         </div>
-        <button id="btn-profile" class="btn btn-profile" title="Kliknij, aby zobaczyć lub wygenerować profil gustu">
-          🧠 <span id="profile-pill-text" data-i18n="profile_loading">Profil: Ładowanie...</span>
+
+        <button id="btn-new-run" class="btn btn-primary btn-cta">
+          <svg class="icon-svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="12" y1="5" x2="12" y2="19"></line>
+            <line x1="5" y1="12" x2="19" y2="12"></line>
+          </svg>
+          <span data-i18n="btn_new_run">Nowa Edycja</span>
         </button>
-        <button id="btn-sync" class="btn btn-secondary">
-          <span class="icon">🔄</span> <span data-i18n="btn_sync">Sync Simkl</span>
-        </button>
-        <button id="btn-new-run" class="btn btn-primary">
-          <span class="icon">✨</span> <span data-i18n="btn_new_run">Nowa Edycja</span>
-        </button>
-        <button id="btn-history" class="btn btn-secondary">
-          <span class="icon">📜</span> <span data-i18n="btn_history">Historia Decyzji</span>
+
+        <button id="btn-mobile-menu" class="btn-icon-only mobile-only" aria-label="Menu" aria-expanded="false">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="3" y1="12" x2="21" y2="12"></line>
+            <line x1="3" y1="6" x2="21" y2="6"></line>
+            <line x1="3" y1="18" x2="21" y2="18"></line>
+          </svg>
         </button>
       </div>
     </div>
@@ -45,39 +92,67 @@
 
   <!-- Main Content -->
   <main class="container">
-    <!-- Run Info & Filter Toolbar -->
+    <!-- Compact Run Info & Filter Toolbar -->
     <section class="toolbar-section">
-      <div class="run-selector-row">
-        <label for="run-select" class="form-label" data-i18n="run_selector_label">Edycja rekomendacji:</label>
-        <select id="run-select" class="select-input">
-          <option value="" data-i18n="run_select_placeholder">Ładowanie wygenerowanych edycji...</option>
-        </select>
-        <span id="run-meta-status" class="badge">Status</span>
+      <div class="toolbar-top-row">
+        <div class="run-selector-group">
+          <label for="run-select" class="sr-only" data-i18n="run_selector_label">Edycja rekomendacji:</label>
+          <select id="run-select" class="select-input">
+            <option value="" data-i18n="run_select_placeholder">Ładowanie wygenerowanych edycji...</option>
+          </select>
+          <span id="run-meta-status" class="badge">Status</span>
+        </div>
+
+        <div class="run-meta-compact">
+          <span id="summary-meta" class="summary-meta-inline">Edycja: - | Model: -</span>
+          <button type="button" id="btn-toggle-summary" class="btn-summary-toggle" aria-expanded="false" title="Pokaż/ukryj podsumowanie edycji">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="10"></circle>
+              <line x1="12" y1="16" x2="12" y2="12"></line>
+              <line x1="12" y1="8" x2="12.01" y2="8"></line>
+            </svg>
+            <span>Info</span>
+          </button>
+        </div>
       </div>
 
-      <div id="run-summary-box" class="run-summary-card">
-        <div class="summary-header">
-          <span id="summary-meta" class="summary-meta">Edycja: - | Model: - | Data: -</span>
-        </div>
+      <div id="run-summary-box" class="run-summary-collapsible collapsed">
         <p id="summary-text" class="summary-text" data-i18n="run_summary_empty">Wybierz lub wygeneruj edycję rekomendacji.</p>
       </div>
 
-      <!-- Filters -->
+      <!-- Segmented Filters -->
       <div class="filters-bar">
-        <div class="filter-group">
-          <span class="filter-label" data-i18n="filter_type">Typ:</span>
-          <button class="chip active" data-type-filter="all" data-i18n="filter_type_all">Wszystkie</button>
-          <button class="chip" data-type-filter="movie" data-i18n="filter_type_movie">Filmy</button>
-          <button class="chip" data-type-filter="show" data-i18n="filter_type_show">Seriale</button>
+        <div class="segmented-group" role="group" aria-label="Typ mediów">
+          <button class="seg-btn active" data-type-filter="all" data-i18n="filter_type_all">Wszystkie</button>
+          <button class="seg-btn" data-type-filter="movie" data-i18n="filter_type_movie">Filmy</button>
+          <button class="seg-btn" data-type-filter="show" data-i18n="filter_type_show">Seriale</button>
         </div>
-        <div class="filter-group">
-          <span class="filter-label" data-i18n="filter_status">Status:</span>
-          <button class="chip active" data-status-filter="all" data-i18n="filter_status_all">Wszystkie</button>
-          <button class="chip" data-status-filter="pending" data-i18n="filter_status_pending">Do decyzji</button>
-          <button class="chip" data-status-filter="accepted" data-i18n="filter_status_accepted">Zaakceptowane</button>
-          <button class="chip" data-status-filter="added" data-i18n="filter_status_added">W Simkl</button>
-          <button class="chip" data-status-filter="rejected" data-i18n="filter_status_rejected">Odrzucone</button>
-          <button class="chip" data-status-filter="seen" data-i18n="filter_status_seen">Obejrzane</button>
+
+        <div class="segmented-group segmented-scroll" role="group" aria-label="Status decyzji">
+          <button class="seg-btn active" data-status-filter="all">
+            <span data-i18n="filter_status_all">Wszystkie</span>
+            <span class="filter-count" data-count-for="all">0</span>
+          </button>
+          <button class="seg-btn" data-status-filter="pending">
+            <span data-i18n="filter_status_pending">Do decyzji</span>
+            <span class="filter-count" data-count-for="pending">0</span>
+          </button>
+          <button class="seg-btn" data-status-filter="accepted">
+            <span data-i18n="filter_status_accepted">Zaakceptowane</span>
+            <span class="filter-count" data-count-for="accepted">0</span>
+          </button>
+          <button class="seg-btn" data-status-filter="added">
+            <span data-i18n="filter_status_added">W Simkl</span>
+            <span class="filter-count" data-count-for="added">0</span>
+          </button>
+          <button class="seg-btn" data-status-filter="rejected">
+            <span data-i18n="filter_status_rejected">Odrzucone</span>
+            <span class="filter-count" data-count-for="rejected">0</span>
+          </button>
+          <button class="seg-btn" data-status-filter="seen">
+            <span data-i18n="filter_status_seen">Obejrzane</span>
+            <span class="filter-count" data-count-for="seen">0</span>
+          </button>
         </div>
       </div>
     </section>
@@ -91,18 +166,26 @@
     </section>
   </main>
 
-  <!-- Sticky Bottom Bar for Simkl Approval -->
+  <!-- Floating Bottom Dock for Simkl Approval -->
   <aside id="approval-bar" class="approval-bar hidden">
     <div class="approval-content">
       <div class="approval-info">
-        <span class="icon">✅</span>
+        <div class="approval-icon-wrap">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="20 6 9 17 4 12"></polyline>
+          </svg>
+        </div>
         <div>
           <strong id="approved-count-text">0 <span data-i18n="approved_items_count">pozycji zaakceptowanych</span></strong>
-          <p class="subtext" data-i18n="approved_items_subtext">Zostaną bezpiecznie dodane do Twojej listy Plan to Watch w Simkl (bez ryzyka duplikatów).</p>
+          <p class="subtext" data-i18n="approved_items_subtext">Zostaną bezpiecznie dodane do Twojej listy Plan to Watch w Simkl.</p>
         </div>
       </div>
-      <button id="btn-submit-approve" class="btn btn-success btn-lg">
-        🚀 <span data-i18n="btn_submit_approve">Wyślij zaakceptowane do Simkl</span>
+      <button id="btn-submit-approve" class="btn btn-success">
+        <svg class="icon-svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="22" y1="2" x2="11" y2="13"></line>
+          <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+        </svg>
+        <span data-i18n="btn_submit_approve">Wyślij zaakceptowane do Simkl</span>
       </button>
     </div>
   </aside>
@@ -112,13 +195,17 @@
     <div class="modal-dialog modal-new-run-dialog">
       <div class="modal-header">
         <h3 data-i18n="modal_new_run_title">Generowanie nowej edycji rekomendacji</h3>
-        <button class="modal-close" data-close-modal>&times;</button>
+        <button class="modal-close" data-close-modal aria-label="Zamknij">&times;</button>
       </div>
       <form id="form-new-run">
         <div class="modal-body modal-new-run-body">
           <!-- Active Language Indicator -->
           <div class="run-lang-indicator">
-            <span class="run-lang-icon">🌐</span>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="10"></circle>
+              <line x1="2" y1="12" x2="22" y2="12"></line>
+              <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
+            </svg>
             <span class="run-lang-text"><span data-i18n="run_lang_label">Język rekomendacji:</span> <strong id="run-active-lang-label">Polski (PL)</strong></span>
             <span class="run-lang-badge" data-i18n="run_lang_app_aligned">Zgodny z aplikacją</span>
           </div>
@@ -127,7 +214,11 @@
           <div class="run-limits-grid">
             <div class="limit-card">
               <div class="limit-header">
-                <span class="limit-icon">🎬</span>
+                <svg class="limit-icon-svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18"></rect>
+                  <line x1="7" y1="2" x2="7" y2="22"></line>
+                  <line x1="17" y1="2" x2="17" y2="22"></line>
+                </svg>
                 <label for="input-movie-limit" class="limit-title" data-i18n="field_movies">Filmy</label>
               </div>
               <p class="limit-subtitle" data-i18n="field_movie_limit">Liczba pozycji (domyślnie 10)</p>
@@ -140,7 +231,10 @@
 
             <div class="limit-card">
               <div class="limit-header">
-                <span class="limit-icon">📺</span>
+                <svg class="limit-icon-svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <rect x="2" y="7" width="20" height="15" rx="2" ry="2"></rect>
+                  <polyline points="17 2 12 7 7 2"></polyline>
+                </svg>
                 <label for="input-show-limit" class="limit-title" data-i18n="field_shows">Seriale</label>
               </div>
               <p class="limit-subtitle" data-i18n="field_show_limit">Liczba pozycji (domyślnie 5)</p>
@@ -152,12 +246,12 @@
             </div>
           </div>
 
-          <!-- Section: Discovery Options (Toggle Switch Cards) -->
+          <!-- Section: Discovery Options -->
           <div class="run-options-list">
             <label class="toggle-card" for="input-exclude-animation">
               <div class="toggle-card-info">
                 <div class="toggle-card-title">
-                  <span>🚫</span> <span data-i18n="field_exclude_animation_title">Wyklucz animacje</span>
+                  <span data-i18n="field_exclude_animation_title">Wyklucz animacje</span>
                 </div>
                 <p class="toggle-card-desc" data-i18n="field_exclude_animation_desc">Pomiń produkcje animowane (zgodnie z profilem gustu)</p>
               </div>
@@ -170,7 +264,7 @@
             <label class="toggle-card" for="input-include-wildcards">
               <div class="toggle-card-info">
                 <div class="toggle-card-title">
-                  <span>🎲</span> <span data-i18n="field_include_wildcards_title">Pozycje 'Zaskocz mnie'</span>
+                  <span data-i18n="field_include_wildcards_title">Pozycje 'Zaskocz mnie'</span>
                 </div>
                 <p class="toggle-card-desc" data-i18n="field_include_wildcards_desc">1 film i 1 serial poza typowym profilem na poszerzenie gustu</p>
               </div>
@@ -183,9 +277,9 @@
         </div>
 
         <div class="modal-footer">
-          <button type="button" class="btn btn-secondary" data-close-modal data-i18n="btn_cancel">Anuluj</button>
+          <button type="button" class="btn btn-ghost" data-close-modal data-i18n="btn_cancel">Anuluj</button>
           <button type="submit" id="btn-submit-run" class="btn btn-primary" data-i18n="btn_start_generation">
-            <span class="icon">✨</span> Uruchom generowanie
+            Uruchom generowanie
           </button>
         </div>
       </form>
@@ -196,19 +290,19 @@
   <div id="modal-profile" class="modal-overlay hidden">
     <div class="modal-dialog modal-lg">
       <div class="modal-header">
-        <h3 data-i18n="modal_profile_title">🧠 Profil Gustu Użytkownika</h3>
-        <button class="modal-close" data-close-modal>&times;</button>
+        <h3 data-i18n="modal_profile_title">Profil Gustu Użytkownika</h3>
+        <button class="modal-close" data-close-modal aria-label="Zamknij">&times;</button>
       </div>
       <div class="modal-body">
         <div id="profile-content-container">
           <p class="loading-text" data-i18n="profile_loading">Ładowanie profilu gustu...</p>
         </div>
       </div>
-      <div class="modal-footer" style="display: flex; justify-content: space-between; align-items: center;">
+      <div class="modal-footer modal-footer-between">
         <button type="button" id="btn-generate-profile" class="btn btn-primary" data-i18n="btn_generate_profile">
-          ⚡ Wygeneruj profil (Gemini)
+          Wygeneruj profil (Gemini)
         </button>
-        <button type="button" class="btn btn-secondary" data-close-modal data-i18n="btn_close">Zamknij</button>
+        <button type="button" class="btn btn-ghost" data-close-modal data-i18n="btn_close">Zamknij</button>
       </div>
     </div>
   </div>
@@ -218,7 +312,7 @@
     <div class="modal-dialog modal-lg">
       <div class="modal-header">
         <h3 data-i18n="modal_history_title">Historia decyzji użytkownika</h3>
-        <button class="modal-close" data-close-modal>&times;</button>
+        <button class="modal-close" data-close-modal aria-label="Zamknij">&times;</button>
       </div>
       <div class="modal-body">
         <div id="history-table-container">
@@ -226,7 +320,7 @@
         </div>
       </div>
       <div class="modal-footer">
-        <button type="button" class="btn btn-secondary" data-close-modal data-i18n="btn_close">Zamknij</button>
+        <button type="button" class="btn btn-ghost" data-close-modal data-i18n="btn_close">Zamknij</button>
       </div>
     </div>
   </div>
@@ -236,25 +330,28 @@
     <div class="modal-dialog modal-video">
       <div class="modal-header">
         <h3 id="modal-trailer-title" data-i18n="modal_trailer_title">Zwiastun</h3>
-        <button class="modal-close" data-close-trailer>&times;</button>
+        <button class="modal-close" data-close-trailer aria-label="Zamknij">&times;</button>
       </div>
       <div class="modal-body modal-video-body">
         <div id="trailer-player-container" class="video-container">
           <!-- iframe dynamically injected when opened, cleared on close -->
         </div>
         <div id="trailer-fallback-container" class="trailer-fallback hidden">
-          <div class="fallback-icon">🎬</div>
+          <svg class="fallback-icon-svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18"></rect>
+            <polygon points="10 8 16 12 10 16 10 8"></polygon>
+          </svg>
           <p id="trailer-fallback-text" data-i18n="trailer_fallback_text">Brak bezpośredniego zwiastuna w bazie TMDB dla tej pozycji.</p>
           <a id="trailer-fallback-link" href="#" target="_blank" rel="noopener noreferrer" class="btn btn-primary" data-i18n="trailer_fallback_search">
-            🔍 Szukaj zwiastuna na YouTube
+            Szukaj zwiastuna na YouTube
           </a>
         </div>
       </div>
       <div class="modal-footer modal-video-footer">
-        <a id="trailer-direct-link" href="#" target="_blank" rel="noopener noreferrer" class="btn btn-secondary btn-sm" data-i18n="trailer_open_youtube">
+        <a id="trailer-direct-link" href="#" target="_blank" rel="noopener noreferrer" class="btn btn-ghost btn-sm" data-i18n="trailer_open_youtube">
           Otwórz na YouTube ↗
         </a>
-        <button type="button" class="btn btn-secondary btn-sm" data-close-trailer data-i18n="btn_close">Zamknij</button>
+        <button type="button" class="btn btn-ghost btn-sm" data-close-trailer data-i18n="btn_close">Zamknij</button>
       </div>
     </div>
   </div>
